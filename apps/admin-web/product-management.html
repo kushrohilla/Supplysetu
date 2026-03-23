@@ -85,7 +85,7 @@
       <div class="shell-main">
         <header class="topbar">
           <div class="topbar-left">
-            <button class="icon-button mobile-only" type="button" aria-controls="sidebar" aria-expanded="false">
+            <button class="icon-button mobile-only" type="button" aria-controls="sidebar" aria-expanded="false" title="Toggle sidebar menu">
               <span></span><span></span><span></span>
             </button>
             <div>
@@ -94,7 +94,7 @@
             </div>
           </div>
           <div class="topbar-right">
-            <button class="icon-button notification-button" type="button">
+            <button class="icon-button notification-button" type="button" title="View notifications">
               <span class="notification-dot" aria-hidden="true"></span>
               <span class="bell-icon" aria-hidden="true">!</span>
             </button>
@@ -109,8 +109,8 @@
         </header>
 
         <main class="content-shell">
-          <div class="content-container">
-            <section class="page-header">
+          <div class="admin-page-container">
+            <section class="page-header surface-block page-header-block">
               <div>
                 <p class="eyebrow">Distributor Product Management</p>
                 <h3 class="page-title">Smart Catalogue + Pricing Control</h3>
@@ -123,24 +123,35 @@
               </div>
             </section>
 
-            <section class="toolbar">
+            <section class="toolbar action-toolbar-block">
               <label class="search-field" for="search-input">
                 <span aria-hidden="true">Q</span>
                 <input id="search-input" type="search" placeholder="Search product, sku, or brand" />
               </label>
               <div class="action-group">
-                <label class="field"><select id="brand-filter" class="field-select"></select></label>
-                <label class="field"><select id="status-filter" class="field-select"><option value="all">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-                <button id="scheme-manager-btn" class="action-button" type="button">Scheme Manager</button>
-                <button id="add-product-btn" class="action-button" type="button">Add Product</button>
+                <button id="scheme-manager-btn" class="action-button" type="button" title="Manage pricing schemes">Scheme Manager</button>
+                <button id="add-product-btn" class="action-button" type="button" title="Add a new product">Add Product</button>
                 <button id="import-btn" class="action-button" type="button">Import Catalogue</button>
                 <button id="catalogue-btn" class="action-button primary" type="button">Add From Brand Catalogue</button>
               </div>
             </section>
 
-            <section class="summary-grid" id="kpi-grid"></section>
+            <section class="surface-block insight-card-grid" aria-label="Insights">
+              <div class="summary-grid" id="kpi-grid"></div>
+            </section>
 
-            <section class="panel panel-table">
+            <section class="filter-bar filter-section-block">
+              <div class="filter-group">
+                <span class="filter-label" id="brand-filter-label">Brand</span>
+                <label class="field"><select id="brand-filter" class="field-select" aria-labelledby="brand-filter-label"></select></label>
+              </div>
+              <div class="filter-group">
+                <span class="filter-label" id="status-filter-label">Status</span>
+                <label class="field"><select id="status-filter" class="field-select" aria-labelledby="status-filter-label"><option value="all">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+              </div>
+            </section>
+
+            <section class="panel panel-table table-section-block">
               <div class="panel-head">
                 <div>
                   <p class="eyebrow">Product Master</p>
@@ -166,7 +177,7 @@
                   <tbody id="product-tbody"></tbody>
                 </table>
               </div>
-              <div class="metric-foot" style="padding: 1rem;">
+              <div class="metric-foot table-footer">
                 <button id="prev-page" class="action-button" type="button">Prev</button>
                 <span id="page-label"></span>
                 <button id="next-page" class="action-button" type="button">Next</button>

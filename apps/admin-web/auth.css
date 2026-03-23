@@ -263,6 +263,7 @@ body {
   background: rgba(255, 253, 248, 0.85);
   cursor: pointer;
   transition: all 0.2s ease;
+  -webkit-user-select: none;
   user-select: none;
 }
 .brand-chip:hover {
@@ -474,6 +475,22 @@ body {
   margin: 0.6rem 0 0;
   color: var(--text-muted);
   font-size: 1rem;
+}
+
+/* ─── Custom brand field ─── */
+.custom-brand-field {
+  margin-top: 1rem;
+}
+.custom-brand-input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+.custom-brand-input {
+  flex: 1;
+}
+.custom-brand-btn {
+  flex: none;
+  padding: 0.7rem 1rem;
 }
 
 /* ─── Responsive ─── */

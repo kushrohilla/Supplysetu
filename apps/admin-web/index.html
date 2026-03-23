@@ -119,11 +119,11 @@
         </header>
 
         <main class="content-shell">
-          <div class="content-container">
-            <section class="page-header">
+          <div class="admin-page-container">
+            <section class="page-header surface-block page-header-block">
               <div>
                 <p class="eyebrow" id="page-kicker">Command center</p>
-                <h3 id="page-title">Dashboard</h3>
+                <h3 class="page-title" id="page-title">Dashboard</h3>
                 <p class="page-copy" id="page-description">
                   High-level operational visibility with reserved space for module-specific data.
                 </p>
@@ -134,7 +134,7 @@
               </div>
             </section>
 
-            <section class="toolbar">
+            <section class="toolbar action-toolbar-block">
               <label class="search-field" for="quick-search">
                 <span aria-hidden="true">Q</span>
                 <input id="quick-search" type="search" placeholder="Quick search" />
@@ -142,9 +142,11 @@
               <div class="action-group" id="action-group" aria-label="Page actions"></div>
             </section>
 
-            <section class="summary-grid" id="summary-grid" aria-label="Summary cards"></section>
+            <section class="surface-block insight-card-grid" aria-label="Summary cards">
+              <div class="summary-grid" id="summary-grid"></div>
+            </section>
 
-            <section class="filter-bar" id="filter-bar" hidden>
+            <section class="filter-bar filter-section-block" id="filter-bar" hidden>
               <div class="filter-group">
                 <span class="filter-label">Status</span>
                 <div class="filter-options" id="status-filter"></div>
@@ -159,7 +161,11 @@
               </div>
             </section>
 
+            <section class="surface-block table-section-block" id="table-section-block">
+
             <section class="scheme-banner" id="scheme-banner" hidden></section>
+
+
 
             <section class="panel route-panel" id="route-panel" hidden>
               <div class="panel-head">
@@ -292,6 +298,7 @@
                 </div>
                 <div id="detail-b-body"></div>
               </article>
+            </section>
             </section>
           </div>
         </main>

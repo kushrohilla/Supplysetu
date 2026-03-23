@@ -209,7 +209,7 @@ function renderKpis() {
     ["Inactive SKUs", inactiveCount, "Temporarily unavailable"],
     ["Scheme linked", schemeCount, "Pricing strategy in motion"],
     ["Fast moving", fastCount, "Priority replenishment list"]
-  ].map((kpi) => `<article class="metric-card"><dl><dt>${kpi[0]}</dt><dd>${kpi[1]}</dd></dl><p class="metric-trend" style="margin-top:0.4rem;font-size:0.75rem;color:var(--text-muted);">${kpi[2]}</p></article>`).join("");
+  ].map((kpi) => `<article class="metric-card"><dl><dt>${kpi[0]}</dt><dd>${kpi[1]}</dd></dl><p class="metric-trend">${kpi[2]}</p></article>`).join("");
 }
 
 function renderTableUI() {

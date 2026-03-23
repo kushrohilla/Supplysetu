@@ -50,7 +50,7 @@
       </div>
 
       <!-- ===================== SIGNUP MODE ===================== -->
-      <div class="auth-card" id="signup-card" style="display:none;">
+      <div class="auth-card" id="signup-card" hidden>
         <!-- Steps indicator -->
         <div class="steps-indicator" id="steps-indicator">
           <span class="step-dot active" id="step-dot-1">1</span>
@@ -116,11 +116,11 @@
             <div class="brand-chips-grid" id="brand-chips-grid">
               <!-- Rendered by JS -->
             </div>
-            <div class="auth-field" style="margin-top: 1rem;">
+            <div class="auth-field custom-brand-field">
               <label for="custom-brand">Add a custom brand</label>
-              <div style="display:flex;gap:0.5rem;">
-                <input id="custom-brand" type="text" placeholder="Type brand name..." style="flex:1;" />
-                <button class="auth-btn" type="button" id="add-custom-brand" style="flex:none;padding:0.7rem 1rem;">+ Add</button>
+              <div class="custom-brand-input-group">
+                <input id="custom-brand" type="text" placeholder="Type brand name..." class="custom-brand-input" />
+                <button class="auth-btn" type="button" id="add-custom-brand" class="custom-brand-btn">+ Add</button>
               </div>
             </div>
             <div class="auth-actions">
@@ -154,7 +154,7 @@
       </div>
 
       <!-- ===================== WELCOME SCREEN ===================== -->
-      <div class="auth-card" id="welcome-card" style="display:none;">
+      <div class="auth-card" id="welcome-card" hidden>
         <div class="welcome-screen show">
           <div class="welcome-icon">✓</div>
           <h2 id="welcome-name">Welcome!</h2>
