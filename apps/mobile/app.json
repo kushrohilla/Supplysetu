@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "SupplySetu",
+    "slug": "supplysetu-mobile",
+    "scheme": "supplysetu",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "platforms": [
+      "android"
+    ],
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.supplysetu.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#F3E9D8"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

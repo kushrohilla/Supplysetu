@@ -1,0 +1,1 @@
+Notification routes live here.

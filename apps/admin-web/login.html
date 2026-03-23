@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SupplySetu Admin — Login</title>
+    <meta name="description" content="Login to SupplySetu Admin Panel — Distributor and Super Stockist operations console." />
+    <link rel="stylesheet" href="./auth.css" />
+  </head>
+  <body>
+
+    <!-- Floating particles -->
+    <div class="particles" id="particles" aria-hidden="true"></div>
+
+    <div class="auth-container" id="auth-container">
+      <!-- Brand header -->
+      <div class="auth-brand">
+        <div class="auth-logo" aria-hidden="true">SS</div>
+        <h1>SupplySetu</h1>
+        <p>Distributor & Super Stockist Operations Console</p>
+      </div>
+
+      <!-- ===================== LOGIN MODE ===================== -->
+      <div class="auth-card" id="login-card">
+        <div class="auth-card-head">
+          <p class="eyebrow">Welcome back</p>
+          <h2>Sign in to your account</h2>
+          <p>Enter your registered company name and password to access the admin panel.</p>
+        </div>
+        <div class="auth-body">
+          <div class="auth-error" id="login-error"></div>
+          <form id="login-form" autocomplete="off">
+            <div class="auth-field">
+              <label for="login-company">Company Name</label>
+              <input id="login-company" type="text" placeholder="e.g. Shree Ganesh Distributors" required />
+              <p class="field-help">Your distributor or super stockist company name.</p>
+            </div>
+            <div class="auth-field">
+              <label for="login-password">Password</label>
+              <input id="login-password" type="password" placeholder="Enter your password" required />
+            </div>
+            <div class="auth-actions">
+              <button class="auth-btn primary" type="submit" id="login-submit-btn">Sign In</button>
+            </div>
+          </form>
+        </div>
+        <div class="auth-toggle">
+          New distributor? <a id="show-signup" href="#">Create an account</a>
+        </div>
+      </div>
+
+      <!-- ===================== SIGNUP MODE ===================== -->
+      <div class="auth-card" id="signup-card" style="display:none;">
+        <!-- Steps indicator -->
+        <div class="steps-indicator" id="steps-indicator">
+          <span class="step-dot active" id="step-dot-1">1</span>
+          <span class="step-label active" id="step-label-1">Company</span>
+          <span class="step-line" id="step-line-1"></span>
+          <span class="step-dot" id="step-dot-2">2</span>
+          <span class="step-label" id="step-label-2">Brands</span>
+          <span class="step-line" id="step-line-2"></span>
+          <span class="step-dot" id="step-dot-3">3</span>
+          <span class="step-label" id="step-label-3">Confirm</span>
+        </div>
+
+        <!-- Step 1: Company Details -->
+        <div class="step-panel active" id="step-1">
+          <div class="auth-card-head">
+            <p class="eyebrow">Step 1 of 3</p>
+            <h2>Company Details</h2>
+            <p>Enter your distributor or super stockist company information.</p>
+          </div>
+          <div class="auth-body">
+            <div class="auth-error" id="step1-error"></div>
+            <div class="auth-field">
+              <label for="signup-type">Company Type</label>
+              <select id="signup-type" required>
+                <option value="">Select type...</option>
+                <option value="distributor">Distributor</option>
+                <option value="ss">Super Stockist (SS)</option>
+              </select>
+            </div>
+            <div class="auth-field">
+              <label for="signup-company">Company Name</label>
+              <input id="signup-company" type="text" placeholder="e.g. Anubhav Traders" required />
+              <p class="field-help">Legal name of your distributor or super stockist entity.</p>
+            </div>
+            <div class="auth-field">
+              <label for="signup-owner">Owner / Contact Name</label>
+              <input id="signup-owner" type="text" placeholder="e.g. Rajesh Kumar" required />
+            </div>
+            <div class="auth-field">
+              <label for="signup-phone">Phone Number</label>
+              <input id="signup-phone" type="tel" placeholder="+91 98765 43210" required />
+            </div>
+            <div class="auth-field">
+              <label for="signup-password">Create Password</label>
+              <input id="signup-password" type="password" placeholder="Minimum 4 characters" required minlength="4" />
+            </div>
+            <div class="auth-actions">
+              <button class="auth-btn primary" type="button" id="step1-next">Continue to Brands →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Select Brands -->
+        <div class="step-panel" id="step-2">
+          <div class="auth-card-head">
+            <p class="eyebrow">Step 2 of 3</p>
+            <h2>Select Your Brands</h2>
+            <p>Choose the brands you deal in. You'll manage products under these brands.</p>
+          </div>
+          <div class="auth-body">
+            <div class="auth-error" id="step2-error"></div>
+            <span class="brand-chips-label">Select all brands you deal in</span>
+            <div class="brand-chips-grid" id="brand-chips-grid">
+              <!-- Rendered by JS -->
+            </div>
+            <div class="auth-field" style="margin-top: 1rem;">
+              <label for="custom-brand">Add a custom brand</label>
+              <div style="display:flex;gap:0.5rem;">
+                <input id="custom-brand" type="text" placeholder="Type brand name..." style="flex:1;" />
+                <button class="auth-btn" type="button" id="add-custom-brand" style="flex:none;padding:0.7rem 1rem;">+ Add</button>
+              </div>
+            </div>
+            <div class="auth-actions">
+              <button class="auth-btn" type="button" id="step2-back">← Back</button>
+              <button class="auth-btn primary" type="button" id="step2-next">Continue to Confirm →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Confirm -->
+        <div class="step-panel" id="step-3">
+          <div class="auth-card-head">
+            <p class="eyebrow">Step 3 of 3</p>
+            <h2>Confirm & Create Account</h2>
+            <p>Review your information and create your admin account.</p>
+          </div>
+          <div class="auth-body">
+            <div class="signup-summary" id="signup-summary">
+              <!-- Rendered by JS -->
+            </div>
+            <div class="auth-actions">
+              <button class="auth-btn" type="button" id="step3-back">← Back</button>
+              <button class="auth-btn primary" type="button" id="step3-create">Create Account & Enter Admin →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="auth-toggle">
+          Already have an account? <a id="show-login" href="#">Sign in instead</a>
+        </div>
+      </div>
+
+      <!-- ===================== WELCOME SCREEN ===================== -->
+      <div class="auth-card" id="welcome-card" style="display:none;">
+        <div class="welcome-screen show">
+          <div class="welcome-icon">✓</div>
+          <h2 id="welcome-name">Welcome!</h2>
+          <p id="welcome-msg">Setting up your admin panel...</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="./auth.js"></script>
+  </body>
+</html>

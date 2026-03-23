@@ -1,0 +1,40 @@
+{
+  "name": "supplysetu-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Production-ready modular monolith backend scaffold for SupplySetu.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "migrate:make": "node --import tsx ./node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.ts",
+    "migrate:latest": "node --import tsx ./node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.ts",
+    "migrate:rollback": "node --import tsx ./node_modules/knex/bin/cli.js migrate:rollback --knexfile knexfile.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "http-status-codes": "^2.3.0",
+    "knex": "^3.1.0",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^3.0.8"
+  }
+}
