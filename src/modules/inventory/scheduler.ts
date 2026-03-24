@@ -15,7 +15,7 @@ import Bull, { Queue } from 'bull';
 export class InventorySyncScheduler {
   private syncService: InventorySyncService;
   private retryQueue: Queue;
-  private cronJobs: Map<string, cron.ScheduledTask> = new Map();
+  private cronJobs: Map<string, any> = new Map();
 
   constructor(private db: Knex, private redisUrl?: string) {
     this.syncService = new InventorySyncService(db);
@@ -46,9 +46,9 @@ export class InventorySyncScheduler {
 
       // Validate cron expression
       if (!this.isValidCronExpression(config.sync_frequency_cron)) {
-        logger.error(`Invalid cron expression for tenant ${tenantId}`, {
+        logger.error({
           cron: config.sync_frequency_cron,
-        });
+        }, `Invalid cron expression for tenant ${tenantId}`);
         return;
       }
 
@@ -58,13 +58,13 @@ export class InventorySyncScheduler {
       });
 
       this.cronJobs.set(tenantId, job);
-      logger.info(`Inventory sync scheduler initialized for tenant ${tenantId}`, {
+      logger.info({
         cron: config.sync_frequency_cron,
-      });
+      }, `Inventory sync scheduler initialized for tenant ${tenantId}`);
     } catch (error) {
-      logger.error(`Failed to initialize scheduler for tenant ${tenantId}`, {
+      logger.error({
         error: (error as Error).message,
-      });
+      }, `Failed to initialize scheduler for tenant ${tenantId}`);
     }
   }
 
@@ -111,23 +111,23 @@ export class InventorySyncScheduler {
       const result = await this.syncService.processBatchImport(payload);
 
       if (result.status === 'failed') {
-        logger.error(`Scheduled sync failed for tenant ${tenantId}`, {
+        logger.error({
           syncJobId: result.sync_job_id,
           errors: result.errors,
-        });
+        }, `Scheduled sync failed for tenant ${tenantId}`);
         // Queue for retry
         await this.queueForRetry(tenantId, payload);
       } else {
-        logger.info(`Scheduled sync completed for tenant ${tenantId}`, {
+        logger.info({
           syncJobId: result.sync_job_id,
           succeeded: result.succeeded,
           failed: result.failed,
-        });
+        }, `Scheduled sync completed for tenant ${tenantId}`);
       }
     } catch (error) {
-      logger.error(`Scheduled sync error for tenant ${tenantId}`, {
+      logger.error({
         error: (error as Error).message,
-      });
+      }, `Scheduled sync error for tenant ${tenantId}`);
       // Queue for retry
       await this.queueForRetry(tenantId, null);
     }
@@ -159,9 +159,9 @@ export class InventorySyncScheduler {
     const backoffMs = config.retry_backoff_ms * Math.pow(2, retryCount - 1);
 
     if (retryCount > config.max_retry_attempts) {
-      logger.error(`Max retry attempts exceeded for tenant ${tenantId}`, {
+      logger.error({
         maxAttempts: config.max_retry_attempts,
-      });
+      }, `Max retry attempts exceeded for tenant ${tenantId}`);
       return;
     }
 
@@ -178,11 +178,11 @@ export class InventorySyncScheduler {
       updated_at: new Date(),
     });
 
-    logger.info(`Queued sync for retry - tenant ${tenantId}`, {
+    logger.info({
       retryCount,
       nextRetryAt,
       backoffMs,
-    });
+    }, `Queued sync for retry - tenant ${tenantId}`);
   }
 
   /**
@@ -224,9 +224,9 @@ export class InventorySyncScheduler {
               });
           }
         } catch (error) {
-          logger.error(`Error processing retry queue item ${item.id}`, {
+          logger.error({
             error: (error as Error).message,
-          });
+          }, `Error processing retry queue item ${item.id}`);
 
           await this.db('inventory_sync_queue')
             .where({ id: item.id })
@@ -238,9 +238,9 @@ export class InventorySyncScheduler {
         }
       }
     } catch (error) {
-      logger.error('Error in processPendingRetries', {
+      logger.error({
         error: (error as Error).message,
-      });
+      }, 'Error in processPendingRetries');
     }
   }
 
@@ -261,16 +261,16 @@ export class InventorySyncScheduler {
     });
 
     this.retryQueue.on('failed', (job, err) => {
-      logger.error(`Bull retry job failed for tenant ${job.data.tenantId}`, {
+      logger.error({
         error: err.message,
         attempts: job.attemptsMade,
-      });
+      }, `Bull retry job failed for tenant ${job.data.tenantId}`);
     });
 
     this.retryQueue.on('completed', (job) => {
-      logger.info(`Bull retry job completed for tenant ${job.data.tenantId}`, {
+      logger.info({
         attempts: job.attemptsMade,
-      });
+      }, `Bull retry job completed for tenant ${job.data.tenantId}`);
     });
   }
 

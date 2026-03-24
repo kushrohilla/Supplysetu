@@ -55,7 +55,7 @@ export function createInventoryRoutes(db: Knex): Router {
 
       res.status(result.status === 'failed' ? 500 : 200).json(result);
     } catch (error) {
-      logger.error('Sync endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Sync endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -104,7 +104,7 @@ export function createInventoryRoutes(db: Knex): Router {
         validation_status: canFulfill ? 'approved' : 'warning', // Soft validation
       });
     } catch (error) {
-      logger.error('Snapshot endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Snapshot endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -141,7 +141,7 @@ export function createInventoryRoutes(db: Knex): Router {
         failure_reason: job.failure_reason ? JSON.parse(job.failure_reason) : null,
       });
     } catch (error) {
-      logger.error('Sync job status endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Sync job status endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -189,7 +189,7 @@ export function createInventoryRoutes(db: Knex): Router {
         })),
       });
     } catch (error) {
-      logger.error('Sync jobs list endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Sync jobs list endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -228,7 +228,7 @@ export function createInventoryRoutes(db: Knex): Router {
         })),
       });
     } catch (error) {
-      logger.error('Alerts endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Alerts endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -262,7 +262,7 @@ export function createInventoryRoutes(db: Knex): Router {
 
       res.json({ success: true, message: 'Alert acknowledged' });
     } catch (error) {
-      logger.error('Alert acknowledge endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Alert acknowledge endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -303,7 +303,7 @@ export function createInventoryRoutes(db: Knex): Router {
         },
       });
     } catch (error) {
-      logger.error('Dashboard endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Dashboard endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,
@@ -337,7 +337,7 @@ export function createInventoryRoutes(db: Knex): Router {
 
       res.json(result);
     } catch (error) {
-      logger.error('Reconciliation endpoint error', { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, 'Reconciliation endpoint error');
       res.status(500).json({
         error: 'Internal server error',
         message: (error as Error).message,

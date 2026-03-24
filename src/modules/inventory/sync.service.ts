@@ -100,19 +100,19 @@ export class InventorySyncService {
         records_processed: payload.records.length,
         records_succeeded: succeededCount,
         records_failed: errors.length,
-        failure_reason: errors.length > 0 ? JSON.stringify(errors) : null,
+        failure_reason: errors.length > 0 ? JSON.stringify(errors) : undefined,
         completed_at: new Date(),
         execution_time_ms: executionTimeMs,
       });
 
-      logger.info('Batch import completed', {
+      logger.info({
         syncJobId,
         tenant: payload.tenant_id,
         status: finalStatus,
         succeeded: succeededCount,
         failed: errors.length,
         executionMs: executionTimeMs,
-      });
+      }, 'Batch import completed');
 
       return {
         sync_job_id: syncJobId,
@@ -141,11 +141,11 @@ export class InventorySyncService {
         execution_time_ms: executionTimeMs,
       });
 
-      logger.error('Batch import failed', {
+      logger.error({
         syncJobId,
         tenant: payload.tenant_id,
         error: failureReason,
-      });
+      }, 'Batch import failed');
 
       return {
         sync_job_id: syncJobId,
@@ -320,7 +320,8 @@ export class InventorySyncService {
         tenant_id: tenantId,
         product_id: productId,
       })
-      .first();
+      .first()
+      .then(res => res ?? null);
   }
 
   /**
@@ -341,7 +342,8 @@ export class InventorySyncService {
   async getSyncJobStatus(syncJobId: string): Promise<InventorySyncJob | null> {
     return this.db<InventorySyncJob>('inventory_sync_jobs')
       .where({ id: syncJobId })
-      .first();
+      .first()
+      .then(res => res ?? null);
   }
 
   /**

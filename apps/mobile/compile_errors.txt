@@ -1,0 +1,16 @@
+﻿src/screens/app/HomeScreen.tsx(12,29): error TS2307: Cannot find module '../contexts/AuthContext' or its corresponding type declarations.
+src/screens/app/HomeScreen.tsx(13,29): error TS2307: Cannot find module '../contexts/CartContext' or its corresponding type declarations.
+src/screens/app/HomeScreen.tsx(35,11): error TS2339: Property 'selectedDistributor' does not exist on type 'unknown'.
+src/screens/app/HomeScreen.tsx(36,11): error TS2339: Property 'addItem' does not exist on type 'unknown'.
+src/screens/app/HomeScreen.tsx(36,20): error TS2339: Property 'getCartTotal' does not exist on type 'unknown'.
+src/screens/app/HomeScreen.tsx(143,19): error TS2322: Type '"/products"' is not assignable to type '"/(auth)/welcome" | "/(app)" | "/bootstrap" | RelativePathString | ExternalPathString | "/" | "/../screens/auth/OTPLoginScreen" | ... 13 more ... | "/orders/[id]"'.
+src/screens/app/HomeScreen.tsx(169,36): error TS2345: Argument of type '"/search"' is not assignable to parameter of type '"/(auth)/welcome" | "/(app)" | "/bootstrap" | RelativePathString | ExternalPathString | `/bootstrap?${string}` | `/bootstrap#${string}` | "/" | `/?${string}` | `/#${string}` | ... 63 more ... | { ...; }'.
+src/screens/auth/OTPLoginScreen.tsx(12,29): error TS2307: Cannot find module '../contexts/AuthContext' or its corresponding type declarations.
+src/screens/auth/OTPLoginScreen.tsx(17,11): error TS2339: Property 'loginWithOTP' does not exist on type 'unknown'.
+src/screens/auth/OTPLoginScreen.tsx(17,25): error TS2339: Property 'verifyOTP' does not exist on type 'unknown'.
+src/screens/auth/OTPLoginScreen.tsx(57,22): error TS2345: Argument of type '"/distributor-select"' is not assignable to parameter of type '"/(auth)/welcome" | "/(app)" | "/bootstrap" | RelativePathString | ExternalPathString | `/bootstrap?${string}` | `/bootstrap#${string}` | "/" | `/?${string}` | `/#${string}` | ... 63 more ... | { ...; }'.
+src/screens/distributor/DistributorSelectScreen.tsx(11,29): error TS2307: Cannot find module '../contexts/AuthContext' or its corresponding type declarations.
+src/screens/distributor/DistributorSelectScreen.tsx(25,11): error TS2339: Property 'retailer' does not exist on type 'unknown'.
+src/screens/distributor/DistributorSelectScreen.tsx(25,21): error TS2339: Property 'getDistributors' does not exist on type 'unknown'.
+src/screens/distributor/DistributorSelectScreen.tsx(25,38): error TS2339: Property 'selectDistributor' does not exist on type 'unknown'.
+src/screens/distributor/DistributorSelectScreen.tsx(47,20): error TS2345: Argument of type '"/(app)/home"' is not assignable to parameter of type '"/(auth)/welcome" | "/(app)" | "/bootstrap" | RelativePathString | ExternalPathString | `/bootstrap?${string}` | `/bootstrap#${string}` | "/" | `/?${string}` | `/#${string}` | ... 63 more ... | { ...; }'.
