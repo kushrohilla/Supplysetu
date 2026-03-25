@@ -62,9 +62,15 @@ export class OrderController {
         retailer_id: retailerId,
       });
 
-      // Trigger notifications
-      // TODO: Emit event for WhatsApp notification
-      // TODO: Emit event for inventory reservation
+      // TODO_IMPLEMENTATION_REQUIRED: WhatsApp Notification Event
+      // Blocked on: WhatsApp Business API integration in notifications module
+      // Expected: Emit event OrderCreated with customer phone + order details
+      // console.log("[EVENT] OrderCreated - emit to WhatsApp channel");
+      
+      // TODO_IMPLEMENTATION_REQUIRED: Inventory Reservation Event
+      // Blocked on: Inventory module stock reservation implementation
+      // Expected: Emit event InventoryReserved with line_items for stock locking
+      // console.log("[EVENT] InventoryReserved - lock stock for line_items");
 
       res.status(201).json(result);
     } catch (error: any) {

@@ -16,7 +16,23 @@
       "package": "com.supplysetu.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#F3E9D8"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.domain.com",
+              "pathPrefix": "/join"
+            }
+          ]
+        }
+      ]
     },
     "experiments": {
       "typedRoutes": true

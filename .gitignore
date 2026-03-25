@@ -1,5 +1,11 @@
-node_modules
-dist
-.env
-coverage
+node_modules/
+dist/
+.next/
+out/
+coverage/
 *.log
+*.err.log
+.env.local
+.env.*.local
+.DS_Store
+Thumbs.db

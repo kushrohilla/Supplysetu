@@ -32,6 +32,9 @@ export default function OrderSuccessScreen() {
           <AppText variant="label">Expected delivery date</AppText>
           <AppText variant="display">{lastOrderConfirmation?.expectedDeliveryDate ?? "--"}</AppText>
           <AppText variant="body">Order ID: {lastOrderConfirmation?.orderId ?? "--"}</AppText>
+          <AppText variant="body">
+            Distributor: {lastOrderConfirmation?.distributorName ?? "--"}
+          </AppText>
         </View>
         <AppText
           variant="body"
@@ -39,7 +42,7 @@ export default function OrderSuccessScreen() {
             color: theme.colors.textMuted
           }}
         >
-          Your order is now pending approval and route scheduling.
+          Distributor will confirm shortly
         </AppText>
         <AppButton
           label="Back to Home"

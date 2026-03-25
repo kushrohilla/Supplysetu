@@ -25,18 +25,23 @@ export class AuthService {
 
   /**
    * Store OTP in Redis/cache with 5-minute TTL
-   * Placeholder - integrate with cache module
+   * TODO_IMPLEMENTATION_REQUIRED: Redis integration
+   * Blocked on: Cache infrastructure initialization
    */
   async storeOTP(phone: string, otp: string): Promise<void> {
-    // TODO: Implement with Redis
+    // PLACEHOLDER: Not connected to Redis yet
+    // Expected: Store in Redis with key pattern: otp:{phone}, value: otp, TTL: 300s
     console.log(`[OTP] ${phone}: ${otp}`);
   }
 
   /**
    * Verify OTP validity
+   * TODO_IMPLEMENTATION_REQUIRED: Redis integration
+   * Blocked on: Cache infrastructure initialization
    */
   async verifyOTP(phone: string, otp: string): Promise<boolean> {
-    // TODO: Retrieve from Redis and compare
+    // PLACEHOLDER: Currently accepts any 6-digit code
+    // Expected: Retrieve from Redis by key otp:{phone}, compare, then delete key
     // For development: accept any 6-digit code
     return /^\d{6}$/.test(otp);
   }

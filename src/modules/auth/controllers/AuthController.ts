@@ -31,8 +31,10 @@ export class AuthController {
       // Store OTP (Redis with 5min TTL)
       await AuthService.storeOTP(phone, otp);
 
-      // TODO: Send SMS via Twilio/provider
-      console.log(`[SMS] Sending OTP to ${phone}: ${otp}`);
+      // TODO_IMPLEMENTATION_REQUIRED: SMS Gateway Integration
+      // Blocked on: Twilio API configuration and credentials
+      // Expected: Use Twilio SDK to send SMS to {phone} with {otp}
+      console.log(`[SMS] PLACEHOLDER: Sending OTP to ${phone}: ${otp}`);
 
       res.json({
         message: "OTP sent successfully",

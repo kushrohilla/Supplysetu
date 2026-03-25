@@ -274,8 +274,11 @@ export class InventorySyncService {
     }
 
     // Simplified threshold: if qty < 20% of some reference max
-    // In production, would store product max quantity in products table
-    const estimatedMax = 1000; // Placeholder - fetch from products table
+    // TODO_IMPLEMENTATION_REQUIRED: Dynamic low-stock thresholds
+    // Blocked on: Routing module implementation (route-specific min order rules)
+    // Expected: Pull threshold from routing module, not hardcoded here
+    // PLACEHOLDER: estimatedMax = 1000 is hardcoded; should fetch from routing config
+    const estimatedMax = 1000;
     const thresholdQty = (estimatedMax * config.low_stock_threshold_percent) / 100;
 
     if (currentQty < thresholdQty) {

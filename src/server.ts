@@ -1,34 +1,36 @@
-import { createApp } from "./app";
+import { bootstrapApp, registerShutdownHandlers, startServer } from "./bootstrap";
 import { env } from "./config/env";
-import { db } from "./database/knex";
-import { logger } from "./shared/logger";
+import { logger } from "./config/logger.config";
 
-const app = createApp();
+/**
+ * Application Entry Point
+ *
+ * Orchestrates the complete bootstrap sequence:
+ * 1. Initializes configuration (env, logger already loaded)
+ * 2. Creates Express app
+ * 3. Starts HTTP server and dependencies
+ * 4. Registers graceful shutdown handlers
+ *
+ * This file is intentionally minimal - all bootstrap logic is delegated
+ * to the dedicated bootstrap layer modules.
+ */
 
-const server = app.listen(env.PORT, () => {
-  logger.info({ port: env.PORT, env: env.NODE_ENV }, "HTTP server started");
-});
+const main = async () => {
+  try {
+    // Bootstrap Express application
+    const app = bootstrapApp();
 
-const shutdown = async (signal: string) => {
-  logger.info({ signal }, "Shutdown signal received");
+    // Start HTTP server and initialize dependencies
+    const serverContext = startServer({ app, env });
 
-  const forceExitTimer = setTimeout(() => {
-    logger.error({ timeoutMs: env.SHUTDOWN_TIMEOUT_MS }, "Forcing process exit after shutdown timeout");
+    // Register graceful shutdown handlers
+    registerShutdownHandlers(serverContext);
+
+    logger.info("Application bootstrap complete");
+  } catch (error) {
+    logger.error({ error }, "Fatal error during application bootstrap");
     process.exit(1);
-  }, env.SHUTDOWN_TIMEOUT_MS);
-
-  server.close(async () => {
-    await db.destroy();
-    clearTimeout(forceExitTimer);
-    logger.info("HTTP server stopped");
-    process.exit(0);
-  });
+  }
 };
 
-process.on("SIGINT", () => {
-  void shutdown("SIGINT");
-});
-
-process.on("SIGTERM", () => {
-  void shutdown("SIGTERM");
-});
+void main();

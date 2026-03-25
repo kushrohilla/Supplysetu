@@ -9,6 +9,7 @@ export type ProductSummary = {
   basePrice: number;
   advancePrice: number;
   schemeTag: string | null;
+  imageUrl?: string | null;
 };
 
 export type BrandSummary = {

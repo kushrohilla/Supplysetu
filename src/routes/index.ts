@@ -1,4 +1,7 @@
 import { Router } from "express";
+import { db } from "../database/knex";
+import { createInviteRouter } from "../modules/invite/routes/invite.routes";
+import { createRetailerRoutes } from "./retailer-api";
 
 import { adminProductManagementRouter } from "./admin-product-management.routes";
 import { healthRouter } from "./health.routes";
@@ -8,6 +11,8 @@ export const registerRoutes = () => {
 
   router.use("/health", healthRouter);
   router.use(adminProductManagementRouter);
+  router.use("/retailer-api", createRetailerRoutes(db));
+  router.use(createInviteRouter(db));
 
   return router;
 };

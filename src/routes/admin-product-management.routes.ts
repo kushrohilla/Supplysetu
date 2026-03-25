@@ -1,5 +1,17 @@
 import { Router } from "express";
 
+/**
+ * INACTIVE_ROUTE NOTICE
+ * 
+ * Admin Product Management Routes - ALL MOCK DATA (not database-backed)
+ * These routes use in-memory data structures and are NOT connected to the database.
+ * They are mock/placeholder implementations for testing/demonstration only.
+ * 
+ * Status: All 8 routes use mock data
+ * TODO_IMPLEMENTATION_REQUIRED: Connect to real product repositories
+ * Blocked on: Database product table schema finalization
+ */
+
 type ProductRecord = {
   id: string;
   sku_code: string;
@@ -142,6 +154,8 @@ const paginate = <T>(items: T[], page: number, pageSize: number) => {
 
 export const adminProductManagementRouter = Router();
 
+// INACTIVE_ROUTE: GET /admin/products - Mock data (in-memory array)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table
 adminProductManagementRouter.get("/admin/products", (req, res) => {
   const search = String(req.query.search ?? "").trim().toLowerCase();
   const status = String(req.query.status ?? "").trim().toLowerCase();
@@ -193,6 +207,8 @@ adminProductManagementRouter.get("/admin/products", (req, res) => {
   });
 });
 
+// INACTIVE_ROUTE: POST /admin/products - Mock data (in-memory array)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table
 adminProductManagementRouter.post("/admin/products", (req, res) => {
   const brandName = String(req.body.brand_name ?? "").trim();
   const productName = String(req.body.product_name ?? "").trim();
@@ -250,6 +266,8 @@ adminProductManagementRouter.post("/admin/products", (req, res) => {
   });
 });
 
+// INACTIVE_ROUTE: PATCH /admin/products/:id/pricing - Mock data (in-memory array)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table
 adminProductManagementRouter.patch("/admin/products/:id/pricing", (req, res) => {
   const id = String(req.params.id);
   const product = products.find((item) => item.id === id);
@@ -283,6 +301,8 @@ adminProductManagementRouter.patch("/admin/products/:id/pricing", (req, res) => 
   });
 });
 
+// INACTIVE_ROUTE: PATCH /admin/products/:id/status - Mock data (in-memory array)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table
 adminProductManagementRouter.patch("/admin/products/:id/status", (req, res) => {
   const id = String(req.params.id);
   const product = products.find((item) => item.id === id);
@@ -305,6 +325,8 @@ adminProductManagementRouter.patch("/admin/products/:id/status", (req, res) => {
   });
 });
 
+// INACTIVE_ROUTE: GET /admin/catalogue/brands - Mock data (hardcoded array)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database brands table
 adminProductManagementRouter.get("/admin/catalogue/brands", (_req, res) => {
   res.status(200).json({
     success: true,
@@ -314,6 +336,8 @@ adminProductManagementRouter.get("/admin/catalogue/brands", (_req, res) => {
   });
 });
 
+// INACTIVE_ROUTE: GET /admin/catalogue/brands/:brandId/products - Mock data (hardcoded object)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table
 adminProductManagementRouter.get("/admin/catalogue/brands/:brandId/products", (req, res) => {
   const brandId = String(req.params.brandId);
   const items = catalogueByBrand[brandId] ?? [];
@@ -325,6 +349,8 @@ adminProductManagementRouter.get("/admin/catalogue/brands/:brandId/products", (r
   });
 });
 
+// INACTIVE_ROUTE: POST /admin/products/from-catalogue - Mock data (in-memory array manipulation)
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table
 adminProductManagementRouter.post("/admin/products/from-catalogue", (req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [];
   const created: ProductRecord[] = [];
@@ -375,6 +401,8 @@ adminProductManagementRouter.post("/admin/products/from-catalogue", (req, res) =
   });
 });
 
+// INACTIVE_ROUTE: POST /admin/products/import/validate - Validation only, no database persistence
+// TODO_IMPLEMENTATION_REQUIRED: Connect to database products table for persistence
 adminProductManagementRouter.post("/admin/products/import/validate", (req, res) => {
   const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
   const seen = new Set<string>();

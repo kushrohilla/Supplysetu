@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
 
-import { catalogueApi } from "@/features/ordering/api/catalogue-api";
+import { orderApi } from "@/features/ordering/api/order-api";
 import { CartFooter } from "@/features/ordering/components/cart-footer";
 import { PaymentModeOption } from "@/features/ordering/components/payment-mode-option";
 import { useCart } from "@/features/ordering/state/cart-context";
@@ -26,12 +26,13 @@ export default function PaymentModeScreen() {
 
     try {
       setSubmitting(true);
-      const result = await catalogueApi.submitOrder({
+      const result = await orderApi.createOrder({
+        retailerId: "retailer-demo",
         paymentMode,
-        subtotal: summary.subtotal,
-        totalQuantity: summary.totalQuantity
+        items: summary.items
       });
       setLastOrderConfirmation(result);
+      await orderApi.clearCart();
       clearCart();
       router.replace("/(app)/order-success");
     } finally {

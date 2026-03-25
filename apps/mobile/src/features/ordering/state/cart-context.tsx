@@ -4,6 +4,7 @@ import { CartItem, CartSummary, PaymentMode, ProductSummary } from "../ordering.
 
 type OrderConfirmation = {
   orderId: string;
+  distributorName: string;
   expectedDeliveryDate: string;
   paymentMode: PaymentMode;
   subtotal: number;

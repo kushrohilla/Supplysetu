@@ -1,6 +1,15 @@
-import knex from "knex";
+/**
+ * Database Knex Instance (Backward Compatibility)
+ *
+ * DEPRECATED: This file is maintained for backward compatibility only.
+ * The new infrastructure layer (src/infrastructure/database/database.config.ts)
+ * provides superior lifecycle management and testability.
+ *
+ * For new code, use createDatabase() from src/infrastructure instead.
+ * Do NOT rely on this module - it will be removed in future refactoring.
+ */
 
-import knexConfig from "../../knexfile";
-import { env } from "../config/env";
+import { createDatabase } from "../infrastructure";
 
-export const db = knex(knexConfig[env.NODE_ENV]);
+// Create and export singleton for backward compatibility
+export const db = createDatabase();

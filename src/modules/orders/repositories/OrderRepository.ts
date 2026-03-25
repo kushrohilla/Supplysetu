@@ -58,6 +58,9 @@ export class OrderRepository {
       }
 
       // Validate minimum order value (₹1500)
+      // TODO_IMPLEMENTATION_REQUIRED: Move to routing module as configurable rule
+      // Blocked on: Routing module implementation
+      // Expected: Call routingService.validateMinOrderValue(tenantId, totalAmount)
       if (totalAmount < 1500) {
         throw new Error("Minimum order value is ₹1500");
       }
@@ -211,7 +214,10 @@ export class OrderRepository {
     return {
       recent_items: recentItems,
       frequently_ordered: frequentItems,
-      suggested_refills: [], // TODO: Implement refill logic based on stock levels
+      // TODO_IMPLEMENTATION_REQUIRED: Refill logic based on stock levels
+      // Blocked on: Inventory module thresholds + routing module min order rules
+      // Expected: Query inventory snapshots, identify low-stock items, calculate refill quantities
+      suggested_refills: [], // PLACEHOLDER: Empty until inventory/routing modules complete
     };
   }
 }

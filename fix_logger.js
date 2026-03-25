@@ -1,15 +1,19 @@
-const fs = require('fs');
-const path = require('path');
+/**
+ * DEPRECATED - This script is no longer needed
+ * 
+ * This utility was used to fix incorrect logger call signatures in scheduler.ts
+ * before refactoring the logger configuration.
+ * 
+ * With the modular monolith bootstrap refactoring, all dependencies are now
+ * properly initialized and configured through the bootstrap layer
+ * (src/bootstrap/).
+ * 
+ * External scripts should no longer be used for configuration fixes.
+ * Configuration is now centralized in src/config/ and injected through
+ * the bootstrap layer.
+ * 
+ * Archive this file for historical reference only.
+ */
 
-const filePath = path.join(__dirname, 'src/modules/inventory/scheduler.ts');
-let content = fs.readFileSync(filePath, 'utf8');
+// ARCHIVED - REMOVE IN NEXT CLEANUP
 
-// The regex matches logger.<level>(`<msg>` | '<msg>', { <obj> })
-// We need to carefully swap string and object.
-const regex = /logger\.(info|error)\((`[^`]+`|'[^']+'),\s*(\{[\s\S]*?\})\);/g;
-content = content.replace(regex, (match, level, msg, obj) => {
-  return `logger.${level}(${obj}, ${msg});`;
-});
-
-fs.writeFileSync(filePath, content, 'utf8');
-console.log('Fixed logger calls in scheduler.ts');

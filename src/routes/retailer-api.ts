@@ -3,9 +3,12 @@ import { Knex } from "knex";
 import { AuthController } from "../modules/auth/controllers/AuthController";
 import { OrderController } from "../modules/orders/controllers/OrderController";
 import { CatalogueController } from "../modules/catalogue/controllers/CatalogueController";
+import AuthService from "../modules/auth/services/AuthService";
 
-// Middleware for authentication
-const authMiddleware = (db: Knex) => {
+// TODO_IMPLEMENTATION_REQUIRED: Auth middleware token verification
+// Blocked on: Complete JWT validation implementation
+// Status: INCOMPLETE - only checks for Bearer token presence
+const authMiddleware = (_db: Knex) => {
   return async (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
@@ -13,10 +16,17 @@ const authMiddleware = (db: Knex) => {
     }
 
     const token = authHeader.substring(7);
-    
-    // TODO: Verify token and attach retailer to req
-    // This is where AuthService.verifyAccessToken() would be called
-    
+    const decoded = AuthService.verifyAccessToken(token);
+    if (!decoded) {
+      return res.status(401).json({ error: "Invalid authorization token" });
+    }
+
+    (req as Request & { retailer?: { id: number; phone: string; tenantIds: number[] } }).retailer = {
+      id: decoded.retailer_id,
+      phone: decoded.phone,
+      tenantIds: decoded.tenant_ids
+    };
+
     next();
   };
 };

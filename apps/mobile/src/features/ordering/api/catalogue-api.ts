@@ -25,7 +25,8 @@ const buildProducts = (): ProductSummary[] => {
         packSize: `${100 + (index % 6) * 50}g`,
         basePrice,
         advancePrice: Math.max(basePrice - 6, 50),
-        schemeTag: index % 4 === 0 ? "Scheme" : index % 5 === 0 ? "COD+" : null
+        schemeTag: index % 4 === 0 ? "Scheme" : index % 5 === 0 ? "COD+" : null,
+        imageUrl: `https://picsum.photos/seed/${brand.id}-${index + 1}/120/120`
       };
     })
   );

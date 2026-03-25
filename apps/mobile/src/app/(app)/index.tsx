@@ -128,6 +128,13 @@ export default function AppHomeScreen() {
             minHeight: 74
           }}
         />
+        <AppButton
+          label="Scan Distributor QR"
+          variant="secondary"
+          onPress={() => {
+            router.push("/(app)/join/scan-distributor-qr" as never);
+          }}
+        />
 
         <View
           style={{

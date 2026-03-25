@@ -139,11 +139,11 @@ export default function BrowseProductsScreen() {
           }}
         >
           <CartFooter
-            ctaLabel="Choose Payment Mode"
+            ctaLabel="Review Cart"
             disabled={summary.totalQuantity === 0}
             minimumMessage={minimumMessage}
             onPress={() => {
-              router.push("/(app)/checkout/payment");
+              router.push("/(app)/cart" as never);
             }}
             subtotal={summary.subtotal}
             totalQuantity={summary.totalQuantity}

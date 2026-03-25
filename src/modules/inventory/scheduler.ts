@@ -82,16 +82,18 @@ export class InventorySyncScheduler {
 
   /**
    * Execute scheduled sync - fetches from accounting system and processes
-   * In Phase 1: reads from mock/uploaded files
-   * In Phase 2: calls Tally webhook or API directly
+   * TODO_IMPLEMENTATION_REQUIRED: Real accounting system integration
+   * Blocked on: Sync module adapters for Tally/QuickBooks
+   * Phase 1: reads from mock/uploaded files (CURRENT)
+   * Phase 2: calls Tally webhook or API directly
    */
   private async executeScheduledSync(tenantId: string): Promise<void> {
     try {
       logger.info(`Starting scheduled inventory sync for tenant ${tenantId}`);
 
-      // In Phase 2, this would call:
-      // const export = await this.fetchFromTallyAPI(tenantId);
-      // For now, simulate fetching from mock storage
+      // TODO_IMPLEMENTATION_REQUIRED: Replace with real accounting system fetch
+      // Expected: Call routingService or syncService adapter pattern
+      // PLACEHOLDER: Fetch from mock accounting export (Phase 1)
       const mockExport = await this.fetchMockAccountingExport(tenantId);
 
       if (!mockExport || mockExport.length === 0) {
@@ -275,14 +277,20 @@ export class InventorySyncScheduler {
   }
 
   /**
-   * Simulate fetching accounting export
-   * In Phase 2, this would call real Tally API or webhook
+   * Fetch accounting export from external system
+   * TODO_IMPLEMENTATION_REQUIRED: Real accounting system integration
+   * Blocked on: Sync module adapters for Tally/QuickBooks integration
+   * PLACEHOLDER: Mock data only (Phase 1)
+   * In production: Call Tally API, parse JSON/CSV, transform to AccountingExportRecord
    */
   private async fetchMockAccountingExport(tenantId: string): Promise<AccountingExportRecord[]> {
-    // In production, would:
-    // 1. Call Tally API via REST/webhook
-    // 2. Parse CSV/JSON response
-    // 3. Transform to AccountingExportRecord format
+    // PLACEHOLDER: Mock data for development/testing only
+    // Expected flow:
+    // 1. Initialize Tally/accounting system connector
+    // 2. Call API endpoint for inventory export
+    // 3. Parse CSV/JSON response
+    // 4. Transform to AccountingExportRecord format
+    // 5. Return records to processBatchImport()
 
     // Mock data for now
     return [

@@ -15,13 +15,15 @@
     "test": "vitest run",
     "migrate:make": "node --import tsx ./node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.ts",
     "migrate:latest": "node --import tsx ./node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.ts",
-    "migrate:rollback": "node --import tsx ./node_modules/knex/bin/cli.js migrate:rollback --knexfile knexfile.ts"
+    "migrate:rollback": "node --import tsx ./node_modules/knex/bin/cli.js migrate:rollback --knexfile knexfile.ts",
+    "mobile:start": "cd apps/mobile && npm run start"
   },
   "dependencies": {
     "bull": "^4.16.5",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "expo": "^55.0.8",
+    "expo": "54",
+    "expo-dev-client": "~55.0.18",
     "expo-router": "^55.0.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
@@ -32,8 +34,10 @@
     "pg": "^8.13.1",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
-    "react": "19.2.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-native": "0.83.2",
+    "react-native-web": "^0.21.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -42,6 +46,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.9.0",
     "@types/node-cron": "^3.0.11",
+    "@types/react": "~19.2.10",
     "@types/uuid": "^10.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
