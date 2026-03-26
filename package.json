@@ -9,7 +9,7 @@
   ],
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "tsx watch apps/backend/src/core/server.ts",

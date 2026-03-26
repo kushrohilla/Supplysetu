@@ -5,14 +5,22 @@
 1. Copy `.env.example` to `.env`.
 2. Set `DATABASE_URL`, `JWT_SECRET`, and `LOG_LEVEL`.
 3. Run `npm install`.
-4. Run `npm run migrate:latest`.
-5. Run `npm run dev`.
-6. Open `http://localhost:5000/health`.
+4. Run `npm run dev`.
+5. Open `http://localhost:5000/health`.
 
 Expected response:
 
 ```json
 { "status": "ok" }
+```
+
+## Node Version
+
+The repo is pinned for deployment consistency:
+
+```txt
+.nvmrc => 22.13.0
+package.json engines.node => >=22.13.0
 ```
 
 ## Production Scripts
@@ -42,6 +50,50 @@ JWT_SECRET=replace-with-a-strong-secret-key
 LOG_LEVEL=info
 ```
 
+## Programmatic Migrations
+
+Database migrations run automatically during backend startup before Fastify begins listening.
+
+Startup order:
+
+1. initialize Knex
+2. run `runMigrations()`
+3. start Fastify server
+
+## Portable Backend Deployment
+
+Use the included root [Dockerfile](/g:/Supplysetu/Dockerfile) for provider-agnostic backend deployment.
+
+Build locally:
+
+```bash
+docker build -t supplysetu-backend .
+```
+
+Run locally:
+
+```bash
+docker run --rm -p 5000:5000 \
+  -e NODE_ENV=production \
+  -e PORT=5000 \
+  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/supplysetu \
+  -e JWT_SECRET=replace-with-a-strong-secret-key \
+  -e LOG_LEVEL=info \
+  supplysetu-backend
+```
+
+Health check:
+
+```bash
+curl http://localhost:5000/health
+```
+
+Expected:
+
+```json
+{ "status": "ok" }
+```
+
 ## Railway
 
 `railway.json` is included at the repo root.
@@ -63,6 +115,12 @@ LOG_LEVEL=info
    `LOG_LEVEL=info`
 9. Trigger a redeploy.
 10. Generate a public domain in Railway networking settings.
+
+If Railway uses Nixpacks instead of Docker and your provider image is older, set:
+
+```env
+NIXPACKS_NODE_VERSION=22.13.0
+```
 
 ### Git Commands
 
@@ -89,13 +147,13 @@ Expected:
 
 ## Mobile App
 
-Update Expo API base URL to your Railway domain:
+Update Expo API base URL to your deployed domain:
 
 ```ts
 apiBaseUrl: "https://your-backend-url/api/v1"
 ```
 
-The local fallback is now:
+Local fallback:
 
 ```ts
 http://localhost:5000/api/v1
@@ -111,18 +169,25 @@ http://10.0.2.2:5000/api/v1
 
 ### Build Fail
 
-- Confirm Railway detected `npm run build`.
-- Make sure `typescript`, `tsx`, and runtime dependencies are in `package.json`.
-- Re-run locally with `npm run build`.
+- Commit the latest `package-lock.json`.
+- Use Node `22.13.0` or newer.
+- Run `npm run build` locally before pushing.
+- If your platform supports Docker, prefer the included Dockerfile.
 
 ### DB Fail
 
-- Confirm `DATABASE_URL` is set in Railway.
-- Confirm PostgreSQL plugin is attached to the same project.
-- Re-run migrations with the Railway shell or deploy hook if needed.
+- Confirm `DATABASE_URL` is set.
+- Confirm the PostgreSQL instance is reachable from the container/runtime.
+- The backend now blocks startup until migrations succeed.
 
 ### Port Fail
 
-- Do not hardcode the Railway port.
-- The server reads `process.env.PORT` and binds to `0.0.0.0`.
-- Verify the start command is `npm run start`.
+- Do not hardcode cloud ports.
+- The server reads `process.env.PORT`.
+- The server binds to `0.0.0.0`.
+
+### Monorepo Deploy Issues
+
+- Prefer Docker-based deploys for backend-only portability.
+- Commit the root `package-lock.json` after dependency changes.
+- If a provider struggles with workspaces, deploy via Docker instead of native Node buildpacks.
