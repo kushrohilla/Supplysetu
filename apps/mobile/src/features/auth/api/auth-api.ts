@@ -1,4 +1,6 @@
-import { AuthSession } from "@/features/auth/auth.types";
+import { apiClient } from "@/services/api/api-client";
+
+import { AuthSession } from "../auth.types";
 
 type RequestOtpPayload = {
   mobileNumber: string;
@@ -7,6 +9,7 @@ type RequestOtpPayload = {
 type RequestOtpResponse = {
   verificationId: string;
   resendAfterSeconds: number;
+  otp?: string;
 };
 
 type VerifyOtpPayload = {
@@ -15,63 +18,84 @@ type VerifyOtpPayload = {
   otp: string;
 };
 
-const OTP_CODE = "1234";
-const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const buildSession = (mobileNumber: string): AuthSession => {
-  const now = Date.now();
-
-  return {
-    tokens: {
-      accessToken: `mock-access-${mobileNumber}-${now}`,
-      refreshToken: `mock-refresh-${mobileNumber}-${now}`,
-      accessTokenExpiresAt: now + ACCESS_TOKEN_TTL_MS
-    },
-    user: {
-      id: `rtl-${mobileNumber.slice(-6)}`,
-      name: "Retailer",
-      role: "retailer",
-      tenantId: "tenant-demo",
-      mobileNumber
-    }
+type VerifyOtpResponse = {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  retailer: {
+    id: string | number;
+    name: string;
+    phone: string;
   };
+  tenant_ids: Array<string | number>;
 };
+
+const toSession = (payload: VerifyOtpResponse): AuthSession => ({
+  tokens: {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+    accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
+  },
+  user: {
+    id: String(payload.retailer.id),
+    name: payload.retailer.name,
+    role: "retailer",
+    tenantId: String(payload.tenant_ids[0] ?? ""),
+    mobileNumber: payload.retailer.phone,
+  },
+});
 
 export const authApi = {
   async requestOtp(payload: RequestOtpPayload): Promise<RequestOtpResponse> {
-    await delay(400);
+    const response = await apiClient.request<{
+      verification_id: string;
+      resend_after_seconds: number;
+      otp?: string;
+    }>("/auth/login", {
+      method: "POST",
+      body: {
+        phone: payload.mobileNumber,
+      },
+      requiresAuth: false,
+    });
 
     return {
-      verificationId: `verify-${payload.mobileNumber}-${Date.now()}`,
-      resendAfterSeconds: 30
+      verificationId: response.verification_id,
+      resendAfterSeconds: response.resend_after_seconds,
+      otp: response.otp,
     };
   },
 
   async verifyOtp(payload: VerifyOtpPayload): Promise<AuthSession> {
-    await delay(500);
+    const response = await apiClient.request<VerifyOtpResponse>("/auth/verify", {
+      method: "POST",
+      body: {
+        phone: payload.mobileNumber,
+        otp: payload.otp,
+      },
+      requiresAuth: false,
+    });
 
-    if (payload.otp !== OTP_CODE) {
-      throw new Error("Invalid OTP. Use 1234 for the mock flow.");
-    }
-
-    return buildSession(payload.mobileNumber);
+    return toSession(response);
   },
 
   async refresh(refreshToken: string): Promise<AuthSession["tokens"]> {
-    await delay(350);
-
-    if (!refreshToken.startsWith("mock-refresh-")) {
-      throw new Error("Refresh token is invalid");
-    }
-
-    const now = Date.now();
+    const response = await apiClient.request<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    }>("/auth/refresh", {
+      method: "POST",
+      body: {
+        refresh_token: refreshToken,
+      },
+      requiresAuth: false,
+    });
 
     return {
-      accessToken: `mock-access-refresh-${now}`,
-      refreshToken: `mock-refresh-refresh-${now}`,
-      accessTokenExpiresAt: now + ACCESS_TOKEN_TTL_MS
+      accessToken: response.access_token,
+      refreshToken: response.refresh_token,
+      accessTokenExpiresAt: Date.now() + response.expires_in * 1000,
     };
-  }
+  },
 };

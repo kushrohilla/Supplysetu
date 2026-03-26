@@ -16,12 +16,15 @@
     ]
   },
   "include": [
-    "src/**/*.ts",
+    "apps/backend/src/**/*.ts",
+    "packages/**/*.ts",
     "knexfile.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "apps"
+    "apps/mobile",
+    "apps/admin-web",
+    "src"
   ]
 }

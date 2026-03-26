@@ -1,65 +1,69 @@
-# SupplySetu Backend
-
-Production-ready backend scaffold for a private distributor operations platform.
-
-## Stack
-
-- Node.js + TypeScript
-- Express REST API
-- PostgreSQL
-- Knex migrations
-- Pino structured logging
+# SupplySetu
 
 ## Structure
 
 ```text
-src/
-  config/
-  database/
-    migrations/
-  modules/
-    auth/
-    catalogue/
-    orders/
-    pricing/
-    routing/
-    sync/
-    notifications/
-    reporting/
-  routes/
-  shared/
-    controllers/
-    errors/
-    logger/
-    middleware/
+root/
+  apps/
+    backend/
+    mobile/
+  packages/
+    database/
     types/
     utils/
-docs/
-  architecture.md
-  api-contract.md
-  mobile-architecture.md
-apps/
-  mobile/
+  infra/
+    docker/
+  scripts/
 ```
 
-## Commands
+## Backend
 
-```bash
-npm install
-cp .env.example .env
-npm run migrate:latest
-npm run dev
+The backend is a Fastify modular monolith in `apps/backend/src`:
+
+```text
+core/
+  server.ts
+  app.ts
+  config/
+  plugins/
+modules/
+  auth/
+  distributor/
+  catalog/
+  order/
+  inventory/
+  pricing/
+shared/
+  middleware/
+  errors/
+  constants/
+  base-repository.ts
+  event-bus.ts
 ```
+
+Each module follows:
+
+```text
+module-name/
+  module.controller.ts
+  module.service.ts
+  module.repository.ts
+  module.routes.ts
+  module.schema.ts
+```
+
+## Local Run
+
+1. Copy `.env.example` to `.env`.
+2. Ensure PostgreSQL is running and matches the database values in `.env`.
+3. Run `npm install`.
+4. Run `npm run migrate:latest`.
+5. Run `npm run dev` to start the backend on `http://localhost:3000`.
+6. In another terminal run `cd apps/mobile && npm install && npm run start`.
+7. Launch the Expo app. Android emulator uses `http://10.0.2.2:3000/api/v1` automatically.
 
 ## Notes
 
-- All business modules are placeholders only, but the domain boundaries now reflect the intended production system.
-- `GET /api/v1/health` verifies API and database readiness.
-- CORS allowlist defaults are configured through `CORS_ORIGINS` in `.env`.
-- Tenant awareness starts at the schema layer with the `tenants` table and tenant-scoped records.
-- Tally remains the financial and stock source of truth; SupplySetu owns workflow intent and operational state.
-- Order lifecycle contracts are defined in [order-transition-rules.ts](d:/Supplysetu/src/modules/orders/domain/order-transition-rules.ts).
-- Order workflow behaviour and invalid transition responses are documented in [order-state-machine.md](d:/Supplysetu/docs/order-state-machine.md).
-- The versioned REST contract is documented in [api-contract.md](d:/Supplysetu/docs/api-contract.md).
-- The mobile app foundation is documented in [mobile-architecture.md](d:/Supplysetu/docs/mobile-architecture.md).
-- The architectural baseline is documented in [architecture.md](d:/Supplysetu/docs/architecture.md).
+- Mobile feature APIs now call backend endpoints instead of local mocks.
+- Database runtime config and migrations are centralized in `packages/database`.
+- Order placement is transactional in `apps/backend/src/modules/order/module.service.ts`.
