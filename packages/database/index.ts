@@ -60,11 +60,31 @@ export const runMigrations = async (db: Knex, logger: DatabaseLogger): Promise<v
       "Migrations complete",
     );
   } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown migration failure";
+    const stack = error instanceof Error ? error.stack : undefined;
+    const serializedError = JSON.stringify(
+      {
+        reason,
+        stack,
+        error,
+      },
+      null,
+      2,
+    );
+
+    // Railway collapses structured logger metadata in some views, so emit a plain-text copy too.
+    console.error(`Database migration failed: ${reason}`);
+    if (stack) {
+      console.error(stack);
+    } else {
+      console.error(serializedError);
+    }
+
     logger.error(
       {
         err: error,
-        reason: error instanceof Error ? error.message : "Unknown migration failure",
-        stack: error instanceof Error ? error.stack : undefined,
+        reason,
+        stack,
       },
       "Database migration failed",
     );

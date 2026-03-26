@@ -50,11 +50,19 @@ const start = async () => {
     });
     logger.info({ port: PORT }, "Backend server started");
   } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown startup error";
+    const stack = error instanceof Error ? error.stack : undefined;
+
+    console.error(`Failed to start backend server: ${reason}`);
+    if (stack) {
+      console.error(stack);
+    }
+
     logger.error(
       {
         err: error,
-        reason: error instanceof Error ? error.message : "Unknown startup error",
-        stack: error instanceof Error ? error.stack : undefined,
+        reason,
+        stack,
       },
       "Failed to start backend server",
     );
