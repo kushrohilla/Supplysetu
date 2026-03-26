@@ -1,8 +1,8 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import fastify from "fastify";
+import type { Knex } from "knex";
 
-import { createDatabase } from "../../../../packages/database/src";
 import { registerAuthRoutes } from "../modules/auth/module.routes";
 import { registerCatalogRoutes } from "../modules/catalog/module.routes";
 import { registerDistributorRoutes } from "../modules/distributor/module.routes";
@@ -15,8 +15,7 @@ import { createContainer } from "./config/container";
 import { env, logger } from "./config";
 import { containerPlugin } from "./plugins/container";
 
-export const buildApp = async () => {
-  const db = createDatabase(env);
+export const buildApp = async (db: Knex) => {
   const container = createContainer(db);
   const app = fastify({
     logger: {
@@ -35,13 +34,7 @@ export const buildApp = async () => {
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
 
-  app.get("/health", async () => ({
-    success: true,
-    data: {
-      status: "ok",
-      service: "backend",
-    },
-  }));
+  app.get("/health", async () => ({ status: "ok" }));
 
   await app.register(async (api) => {
     await registerAuthRoutes(api);

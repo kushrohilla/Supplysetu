@@ -20,7 +20,7 @@
 
 import type { Knex } from "knex";
 
-import { createKnexConfig } from "./packages/database/src";
+import { createKnexConfig } from "./packages/database";
 import { loadEnv } from "./packages/utils/src/env";
 
 const env = loadEnv();

@@ -18,6 +18,7 @@
   "include": [
     "apps/backend/src/**/*.ts",
     "packages/**/*.ts",
+    "packages/database/*.ts",
     "knexfile.ts"
   ],
   "exclude": [
