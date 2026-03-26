@@ -30,7 +30,7 @@ export async function up(knex: Knex): Promise<void> {
     table.uuid("id").primary();
     table.string("code", 32).notNullable().unique();
     table.string("name", 100).notNullable();
-    table.string("direction", 8).notNullable(); // 'in' or 'out'
+    table.string("direction", 8).nullable(); // 'in', 'out', or null for bidirectional adjustments
     table.text("description").nullable();
     table.boolean("is_active").notNullable().defaultTo(true);
     table.timestamp("created_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
