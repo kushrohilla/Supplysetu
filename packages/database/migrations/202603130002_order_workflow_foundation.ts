@@ -1,6 +1,11 @@
 import type { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
+  const hasOrders = await knex.schema.hasTable("orders");
+  if (hasOrders) {
+    return;
+  }
+
   await knex.schema.createTable("orders", (table) => {
     table.uuid("id").primary();
     table.uuid("tenant_id").notNullable().references("id").inTable("tenants").onDelete("CASCADE");

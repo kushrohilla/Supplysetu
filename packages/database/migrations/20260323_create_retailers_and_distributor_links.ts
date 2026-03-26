@@ -1,6 +1,14 @@
 import type { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
+  const hasRetailers = await knex.schema.hasTable("retailers");
+  const hasOrders = await knex.schema.hasTable("orders");
+
+  // This legacy migration targets the pre-UUID schema. Skip it when the modern order stack already exists.
+  if (hasRetailers || hasOrders) {
+    return;
+  }
+
   // Retailers table - global identity
   await knex.schema.createTable("retailers", (table) => {
     table.increments("id").primary();
