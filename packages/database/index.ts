@@ -1,4 +1,5 @@
 import knex, { type Knex } from "knex";
+import path from "node:path";
 
 export type DatabaseEnv = {
   NODE_ENV: "development" | "test" | "production";
@@ -13,6 +14,8 @@ export type DatabaseLogger = {
 
 let databaseInstance: Knex | null = null;
 
+const resolveMigrationsDirectory = () => path.resolve(__dirname, "migrations");
+
 export const createKnexConfig = (env: DatabaseEnv): Knex.Config => ({
   client: "pg",
   connection: env.DB_SSL
@@ -23,8 +26,8 @@ export const createKnexConfig = (env: DatabaseEnv): Knex.Config => ({
     : env.DATABASE_URL,
   pool: env.NODE_ENV === "production" ? { min: 2, max: 10 } : { min: 1, max: 5 },
   migrations: {
-    // The same config works for local tsx execution and compiled Railway builds.
-    directory: env.NODE_ENV === "production" ? "./dist/packages/database/migrations" : "./packages/database/migrations",
+    // Resolve from this file so local tsx and compiled deployments both find the right folder.
+    directory: resolveMigrationsDirectory(),
     extension: env.NODE_ENV === "production" ? "js" : "ts",
   },
 });
