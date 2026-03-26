@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { orderReviewService } from "@/services/order-review.service";
 import type { OrderLineItem, ReviewQueueOrder } from "@/types/order-review";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ActionType = "FULL" | "PARTIAL" | "CANCEL";
 
@@ -252,7 +253,26 @@ export function OrderReviewQueueScreen() {
             {loading ? (
               <div className="p-4 text-sm text-slate-500">Loading queue...</div>
             ) : sortedOrders.length === 0 ? (
-              <div className="p-4 text-sm text-slate-500">No placed orders in queue.</div>
+              <div className="flex flex-1 items-center justify-center p-8">
+                <EmptyState
+                  icon="📋"
+                  title="Waiting for your first retailer order"
+                  helper="Orders appear here when a connected retailer places an order through the SupplySetu app."
+                  ctaLabel="Share invite link"
+                  onCtaPress={() => alert("Share invite link")} // Temporary since modal logic isn't here
+                  hint={
+                    <>
+                      <p className="mb-2 font-medium text-slate-800">How it works:</p>
+                      <ol className="list-inside list-decimal space-y-1">
+                        <li>Retailer receives your invite code</li>
+                        <li>Retailer browses your catalog</li>
+                        <li>Order appears here for your approval</li>
+                        <li>You approve → dispatch → deliver</li>
+                      </ol>
+                    </>
+                  }
+                />
+              </div>
             ) : (
               <table className="w-full border-collapse text-xs">
                 <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-600">

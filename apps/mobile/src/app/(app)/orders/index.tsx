@@ -6,6 +6,7 @@ import { useOrderHistory } from "@/features/orders/hooks/use-order-history";
 import { OrderHistoryCard } from "@/features/orders/components/order-history-card";
 import { OrderHistorySkeleton } from "@/features/orders/components/order-history-skeleton";
 import { AppText } from "@/shared/components/ui/app-text";
+import { EmptyState } from "@/shared/components/ui/empty-state";
 import { ScreenContainer } from "@/shared/components/ui/screen-container";
 import { useTheme } from "@/shared/theme/theme-context";
 
@@ -43,25 +44,35 @@ export default function OrdersHistoryScreen() {
           </AppText>
         </View>
 
-        {ordersQuery.data.map((order) => (
-          <OrderHistoryCard
-            key={order.id}
-            onOpenTimeline={() => {
-              router.push({
-                pathname: "/(app)/orders/[id]",
-                params: {
-                  id: order.id
-                }
-              });
-            }}
-            onReorder={() => {
-              replaceCart(order.items);
-              setPaymentMode(order.paymentMode);
-              router.push("/(app)/browse");
-            }}
-            order={order}
+        {ordersQuery.data.length === 0 ? (
+          <EmptyState
+            icon="📋"
+            title="Your orders will appear here"
+            helper="Browse your distributor's catalog to place your first order."
+            ctaLabel="Browse catalog"
+            onCtaPress={() => router.replace("/(app)/browse")}
           />
-        ))}
+        ) : (
+          ordersQuery.data.map((order) => (
+            <OrderHistoryCard
+              key={order.id}
+              onOpenTimeline={() => {
+                router.push({
+                  pathname: "/(app)/orders/[id]",
+                  params: {
+                    id: order.id
+                  }
+                });
+              }}
+              onReorder={() => {
+                replaceCart(order.items);
+                setPaymentMode(order.paymentMode);
+                router.push("/(app)/browse");
+              }}
+              order={order}
+            />
+          ))
+        )}
       </ScrollView>
     </ScreenContainer>
   );

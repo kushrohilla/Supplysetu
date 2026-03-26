@@ -7,6 +7,7 @@ import { QuantityStepper } from "@/features/ordering/components/quantity-stepper
 import { useCart } from "@/features/ordering/state/cart-context";
 import { AppButton } from "@/shared/components/ui/app-button";
 import { AppText } from "@/shared/components/ui/app-text";
+import { EmptyState } from "@/shared/components/ui/empty-state";
 import { ScreenContainer } from "@/shared/components/ui/screen-container";
 import { useTheme } from "@/shared/theme/theme-context";
 
@@ -206,14 +207,13 @@ export default function CartScreen() {
             </View>
           }
           ListEmptyComponent={
-            <View style={{ marginTop: theme.spacing.xl, gap: theme.spacing.md }}>
-              <AppText variant="body">Your cart is empty.</AppText>
-              <AppButton
-                label="Browse Products"
-                variant="secondary"
-                onPress={() => router.replace("/(app)/browse")}
-              />
-            </View>
+            <EmptyState
+              icon="🛒"
+              title="Your cart needs items"
+              helper="Add products from the catalog to start building your order."
+              ctaLabel="Add products"
+              onCtaPress={() => router.replace("/(app)/browse")}
+            />
           }
           renderItem={({ item }) => (
             <CartRow

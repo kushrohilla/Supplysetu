@@ -7,6 +7,7 @@ import { HomeScreenSkeleton } from "@/features/home/components/home-screen-skele
 import { useAuthSession } from "@/features/auth/state/auth-context";
 import { AppButton } from "@/shared/components/ui/app-button";
 import { AppText } from "@/shared/components/ui/app-text";
+import { EmptyState } from "@/shared/components/ui/empty-state";
 import { ScreenContainer } from "@/shared/components/ui/screen-container";
 import { useTheme } from "@/shared/theme/theme-context";
 
@@ -66,6 +67,28 @@ export default function AppHomeScreen() {
   }
 
   const { data } = homeQuery;
+
+  // Render Retailer Empty State when no distributor/route is connected
+  if (!data.assignedRouteName || data.totalRetailersInRoute === 0) {
+    return (
+      <ScreenContainer>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}>
+          <EmptyState
+            icon="🔗"
+            title="No distributor connected yet"
+            helper="Enter the invite code your distributor shared with you."
+            ctaLabel="Enter code"
+            onCtaPress={() => router.push("/(app)/join/scan-distributor-qr" as never)}
+            hint={
+              <AppText variant="body" style={{ color: theme.colors.textMuted, textAlign: "left" }}>
+                Search distributor{"\n"}(Coming soon)
+              </AppText>
+            }
+          />
+        </ScrollView>
+      </ScreenContainer>
+    );
+  }
 
   const statCards = [
     {

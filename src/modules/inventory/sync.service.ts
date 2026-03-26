@@ -3,9 +3,8 @@
  * 
  * Core business logic for:
  * - Processing batch imports from accounting systems
- * - Managing inventory snapshots
+ * - Managed via Event Sourced Immutable Ledger (inventory_movements)
  * - Handling sync errors and retries
- * - Maintaining audit trail
  */
 
 import { Knex } from 'knex';
@@ -15,7 +14,6 @@ import {
   InventorySnapshot,
   InventorySyncJob,
   SyncStatus,
-  SyncType,
   BatchImportPayload,
   AccountingExportRecord,
   SyncResult,
@@ -28,14 +26,12 @@ export class InventorySyncService {
 
   /**
    * Main entry point for batch import from accounting system
-   * Orchestrates: validation -> transformation -> atomic update -> audit logging
    */
   async processBatchImport(payload: BatchImportPayload): Promise<SyncResult> {
     const syncJobId = uuidv4();
     const startTime = Date.now();
     const errors: SyncError[] = [];
 
-    // 1. Create sync job record (started state)
     const syncJob = await this.createSyncJob({
       id: syncJobId,
       tenant_id: payload.tenant_id,
@@ -50,12 +46,10 @@ export class InventorySyncService {
       let succeededCount = 0;
       const updatePromises: Promise<void>[] = [];
 
-      // 2. Validate and transform records
       for (let index = 0; index < payload.records.length; index++) {
         const record = payload.records[index];
 
         try {
-          // Data validation
           const validationError = this.validateRecord(record);
           if (validationError) {
             errors.push({
@@ -67,9 +61,8 @@ export class InventorySyncService {
             continue;
           }
 
-          // 3. Atomic update in transaction
           updatePromises.push(
-            this.updateInventorySnapshot(
+            this.processInventoryAdjustment(
               payload.tenant_id,
               record,
               syncJobId,
@@ -88,10 +81,8 @@ export class InventorySyncService {
         }
       }
 
-      // 4. Execute all updates in parallel
       await Promise.all(updatePromises);
 
-      // 5. Update sync job with completion status
       const executionTimeMs = Date.now() - startTime;
       const finalStatus: SyncStatus = errors.length === 0 ? 'success' : 'partial';
 
@@ -122,13 +113,11 @@ export class InventorySyncService {
         failed: errors.length,
         errors,
         execution_time_ms: executionTimeMs,
-        message:
-          finalStatus === 'success'
+        message: finalStatus === 'success'
             ? `Successfully synced ${succeededCount} products`
             : `Synced ${succeededCount}/${payload.records.length} products. ${errors.length} errors.`,
       };
     } catch (error) {
-      // Critical failure - mark job as failed
       const executionTimeMs = Date.now() - startTime;
       const failureReason = (error as Error).message;
 
@@ -153,142 +142,111 @@ export class InventorySyncService {
         total_records: payload.records.length,
         succeeded: 0,
         failed: payload.records.length,
-        errors: [
-          {
+        errors: [{
             record_index: 0,
             error_code: 'CRITICAL_ERROR',
             error_message: failureReason,
-          },
-        ],
+        }],
         execution_time_ms: executionTimeMs,
         message: `Sync failed: ${failureReason}`,
       };
     }
   }
 
-  /**
-   * Validates a single accounting export record
-   * Returns null if valid, error message if invalid
-   */
   private validateRecord(record: AccountingExportRecord): string | null {
-    if (!record.product_id?.trim()) {
-      return 'product_id is required';
-    }
-    if (!Number.isInteger(record.warehouse_available) || record.warehouse_available < 0) {
-      return 'warehouse_available must be a non-negative integer';
-    }
-    if (record.reserved !== undefined && record.reserved < 0) {
-      return 'reserved cannot be negative';
-    }
-    if (record.warehouse_available < 0 || record.reserved > record.warehouse_available) {
-      return 'reserved quantity cannot exceed available quantity';
-    }
+    if (!record.product_id?.trim()) return 'product_id is required';
+    if (!Number.isInteger(record.warehouse_available) || record.warehouse_available < 0) return 'warehouse_available must be a non-negative integer';
     return null;
   }
 
   /**
-   * Atomically updates or creates an inventory snapshot
-   * Includes audit logging of the change
+   * Translates Tally export stock into an immutable ledger adjustment
    */
-  private async updateInventorySnapshot(
+  private async processInventoryAdjustment(
     tenantId: string,
     record: AccountingExportRecord,
     syncJobId: string,
     changeReason: ChangeReason
   ): Promise<void> {
     return this.db.transaction(async (trx) => {
-      // Get current snapshot (if exists)
-      const current = await trx<InventorySnapshot>('inventory_snapshots')
-        .where({
-          tenant_id: tenantId,
-          product_id: record.product_id,
+      // Find tenant product ID mapping
+      const product = await trx('tenant_products')
+        .where({ tenant_id: tenantId })
+        .andWhere(function() {
+          this.where('sku_code', record.product_id).orWhere('id', record.product_id);
         })
         .first();
 
-      const quantityBefore = current?.available_quantity ?? 0;
-      const quantityAfter = record.warehouse_available;
+      if (!product) {
+        throw new Error(`Product mapping not found for ${record.product_id}`);
+      }
 
-      // Upsert inventory snapshot
-      if (current) {
-        await trx<InventorySnapshot>('inventory_snapshots')
-          .where({
-            tenant_id: tenantId,
-            product_id: record.product_id,
-          })
-          .update({
-            available_quantity: record.warehouse_available,
-            reserved_quantity: record.reserved || 0,
-            committed_quantity: record.warehouse_available,
-            last_synced_at: new Date(record.last_count_date),
-            sync_source_reference: record.invoice_id,
-            sync_job_id: syncJobId,
-            updated_at: new Date(),
-          });
-      } else {
-        await trx<InventorySnapshot>('inventory_snapshots').insert({
-          tenant_id: tenantId,
-          product_id: record.product_id,
-          available_quantity: record.warehouse_available,
-          reserved_quantity: record.reserved || 0,
-          committed_quantity: record.warehouse_available,
-          last_synced_at: new Date(record.last_count_date),
-          sync_source_reference: record.invoice_id,
+      const tenantProductId = product.id;
+
+      // 1. Calculate current stock from ledger SUM
+      const stockRow = await trx('inventory_movements')
+        .sum('quantity_change as total_stock')
+        .where({ tenant_id: tenantId, tenant_product_id: tenantProductId })
+        .first();
+
+      const currentStock = Number(stockRow?.total_stock || 0);
+      const newStock = record.warehouse_available;
+      const delta = newStock - currentStock;
+
+      if (delta !== 0) {
+        // Find 'adjustment' movement type reference
+        const mt = await trx('inventory_movement_types').where({ code: 'adjustment' }).first();
+        if (!mt) throw new Error('Reference missing: inventory_movement_types.code = adjustment');
+
+        const sourceDoc = {
           sync_job_id: syncJobId,
-          created_at: new Date(),
-          updated_at: new Date(),
+          reason: changeReason,
+          old_stock: currentStock,
+          new_stock: newStock,
+          invoice_id: record.invoice_id
+        };
+
+        // Insert into immutable ledger
+        await trx('inventory_movements').insert({
+          id: uuidv4(),
+          tenant_id: tenantId,
+          tenant_product_id: tenantProductId,
+          movement_type_id: mt.id,
+          quantity_change: delta,
+          uom: record.unit_of_measure || product.pack_size,
+          source_document: JSON.stringify(sourceDoc),
+          external_reference: record.invoice_id,
+          batch_id: syncJobId,
+          created_at: new Date()
         });
       }
 
-      // Log audit trail
-      await trx('inventory_audit_log').insert({
-        tenant_id: tenantId,
-        product_id: record.product_id,
-        sync_job_id: syncJobId,
-        quantity_before: quantityBefore,
-        quantity_after: quantityAfter,
-        quantity_delta: quantityAfter - quantityBefore,
-        change_reason: changeReason,
-        source_invoice_id: record.invoice_id,
-        recorded_at: new Date(),
+      // 2. Also record historical snapshot trace
+      await trx('tenant_product_stock_snapshots').insert({
+         id: uuidv4(),
+         tenant_id: tenantId,
+         tenant_product_id: tenantProductId,
+         stock_qty: newStock,
+         source: 'accounting_sync',
+         captured_at: record.last_count_date ? new Date(record.last_count_date) : new Date(),
+         created_at: new Date()
       });
 
-      // Check if low stock alert needed
-      await this.evaluateLowStockAlert(trx, tenantId, record.product_id, quantityAfter);
+      // 3. Evaluate low stock
+      await this.evaluateLowStockAlert(trx, tenantId, record.product_id, newStock);
     });
   }
 
-  /**
-   * Evaluates and creates low stock alerts based on configured thresholds
-   */
-  private async evaluateLowStockAlert(
-    trx: Knex.Transaction,
-    tenantId: string,
-    productId: string,
-    currentQty: number
-  ): Promise<void> {
-    // Get sync config for this tenant
+  private async evaluateLowStockAlert(trx: Knex.Transaction, tenantId: string, productId: string, currentQty: number): Promise<void> {
     const config = await trx('inventory_sync_config').where({ tenant_id: tenantId }).first();
+    if (!config) return;
 
-    if (!config) {
-      return; // Config not set, skip alert
-    }
-
-    // Simplified threshold: if qty < 20% of some reference max
-    // TODO_IMPLEMENTATION_REQUIRED: Dynamic low-stock thresholds
-    // Blocked on: Routing module implementation (route-specific min order rules)
-    // Expected: Pull threshold from routing module, not hardcoded here
-    // PLACEHOLDER: estimatedMax = 1000 is hardcoded; should fetch from routing config
     const estimatedMax = 1000;
     const thresholdQty = (estimatedMax * config.low_stock_threshold_percent) / 100;
 
     if (currentQty < thresholdQty) {
-      // Check if alert already exists
       const existingAlert = await trx('inventory_low_stock_alerts')
-        .where({
-          tenant_id: tenantId,
-          product_id: productId,
-          alert_status: 'active',
-        })
+        .where({ tenant_id: tenantId, product_id: productId, alert_status: 'active' })
         .first();
 
       if (!existingAlert) {
@@ -303,45 +261,54 @@ export class InventorySyncService {
         });
       }
     } else {
-      // Resolve existing alert if qty is now above threshold
       await trx('inventory_low_stock_alerts')
-        .where({
-          tenant_id: tenantId,
-          product_id: productId,
-          alert_status: 'active',
-        })
+        .where({ tenant_id: tenantId, product_id: productId, alert_status: 'active' })
         .update({ alert_status: 'resolved', updated_at: new Date() });
     }
   }
 
-  /**
-   * Get current stock snapshot for a product
-   */
   async getProductStock(tenantId: string, productId: string): Promise<InventorySnapshot | null> {
-    return this.db<InventorySnapshot>('inventory_snapshots')
-      .where({
-        tenant_id: tenantId,
-        product_id: productId,
+    const product = await this.db('tenant_products')
+      .where({ tenant_id: tenantId })
+      .andWhere(function() {
+        this.where('sku_code', productId).orWhere('id', productId);
       })
-      .first()
-      .then(res => res ?? null);
+      .first();
+
+    if (!product) return null;
+
+    const stockRow = await this.db('inventory_movements')
+      .sum('quantity_change as qty')
+      .where({ tenant_id: tenantId, tenant_product_id: product.id })
+      .first();
+
+    const lastSync = await this.db('tenant_product_stock_snapshots')
+      .where({ tenant_id: tenantId, tenant_product_id: product.id })
+      .orderBy('created_at', 'desc')
+      .first();
+
+    const available_quantity = Number(stockRow?.qty || 0);
+
+    return {
+      id: 0,
+      tenant_id: tenantId,
+      product_id: product.id,
+      available_quantity: available_quantity,
+      reserved_quantity: 0,
+      committed_quantity: available_quantity,
+      last_synced_at: lastSync?.captured_at || new Date(),
+      created_at: new Date(),
+      updated_at: new Date(),
+      sync_job_id: ''
+    } as InventorySnapshot;
   }
 
-  /**
-   * Get all active low stock alerts for a tenant
-   */
   async getLowStockAlerts(tenantId: string) {
     return this.db('inventory_low_stock_alerts')
-      .where({
-        tenant_id: tenantId,
-        alert_status: 'active',
-      })
+      .where({ tenant_id: tenantId, alert_status: 'active' })
       .orderBy('created_at', 'desc');
   }
 
-  /**
-   * Get sync job details
-   */
   async getSyncJobStatus(syncJobId: string): Promise<InventorySyncJob | null> {
     return this.db<InventorySyncJob>('inventory_sync_jobs')
       .where({ id: syncJobId })
@@ -349,9 +316,6 @@ export class InventorySyncService {
       .then(res => res ?? null);
   }
 
-  /**
-   * List recent sync jobs for a tenant
-   */
   async getSyncJobHistory(tenantId: string, limit = 20) {
     return this.db<InventorySyncJob>('inventory_sync_jobs')
       .where({ tenant_id: tenantId })
@@ -359,16 +323,8 @@ export class InventorySyncService {
       .limit(limit);
   }
 
-  /**
-   * Manual reconciliation: compare database snapshot with actual accounting system export
-   * Identifies discrepancies and creates reconciliation sync job
-   */
-  async initiateReconciliation(
-    tenantId: string,
-    latestAccountingExport: AccountingExportRecord[]
-  ): Promise<SyncResult> {
+  async initiateReconciliation(tenantId: string, latestAccountingExport: AccountingExportRecord[]): Promise<SyncResult> {
     const syncJobId = uuidv4();
-
     const payload: BatchImportPayload = {
       tenant_id: tenantId,
       batch_id: `reconciliation_${syncJobId}`,
@@ -378,15 +334,9 @@ export class InventorySyncService {
       source_system: 'manual_reconciliation',
     };
 
-    // Process as batch import but mark as reconciliation type
-    await this.updateSyncJob(syncJobId, {
-      sync_type: 'manual_reconciliation',
-    });
-
+    await this.updateSyncJob(syncJobId, { sync_type: 'manual_reconciliation' });
     return this.processBatchImport(payload);
   }
-
-  // ===== Private Helpers =====
 
   private async createSyncJob(data: Partial<InventorySyncJob>): Promise<InventorySyncJob> {
     await this.db('inventory_sync_jobs').insert({
@@ -396,7 +346,6 @@ export class InventorySyncService {
       records_failed: 0,
       ...data,
     });
-
     return this.db<InventorySyncJob>('inventory_sync_jobs').where({ id: data.id }).first() as Promise<InventorySyncJob>;
   }
 
@@ -404,17 +353,14 @@ export class InventorySyncService {
     await this.db('inventory_sync_jobs').where({ id: syncJobId }).update(updates);
   }
 
-  /**
-   * Get inventory summary dashboard data
-   */
   async getDashboardSummary(tenantId: string) {
-    const [snapshot] = await Promise.all([
-      this.db<InventorySnapshot>('inventory_snapshots').where({ tenant_id: tenantId }),
-      this.db<any>('inventory_low_stock_alerts').where({
-        tenant_id: tenantId,
-        alert_status: 'active',
-      }),
-    ]);
+    const products = await this.db('tenant_products').where({ tenant_id: tenantId });
+    
+    const stockAgg = await this.db('inventory_movements')
+      .select('tenant_product_id')
+      .sum('quantity_change as qty')
+      .where({ tenant_id: tenantId })
+      .groupBy('tenant_product_id');
 
     const lowStockProducts = await this.db('inventory_low_stock_alerts')
       .where({ tenant_id: tenantId, alert_status: 'active' });
@@ -424,17 +370,28 @@ export class InventorySyncService {
       .orderBy('completed_at', 'desc')
       .first();
 
-    const outOfStockCount = snapshot.filter((s) => s.available_quantity === 0).length;
+    const stockMap = new Map<string, number>();
+    for (const s of stockAgg) {
+      stockMap.set(s.tenant_product_id, Number(s.qty || 0));
+    }
+
+    let outOfStockCount = 0;
+    let inStockCount = 0;
+
+    for (const p of products) {
+       const qty = stockMap.get(p.id) || 0;
+       if (qty <= 0) outOfStockCount++;
+       else inStockCount++;
+    }
 
     return {
-      total_products: snapshot.length,
-      in_stock: snapshot.filter((s) => s.available_quantity > 0).length,
+      total_products: products.length,
+      in_stock: inStockCount,
       low_stock_count: lowStockProducts.length,
       out_of_stock: outOfStockCount,
       last_sync_at: lastSync?.completed_at || null,
-      health_percentage:
-        snapshot.length > 0
-          ? Math.round(((snapshot.length - outOfStockCount) / snapshot.length) * 100)
+      health_percentage: products.length > 0
+          ? Math.round(((products.length - outOfStockCount) / products.length) * 100)
           : 0,
     };
   }

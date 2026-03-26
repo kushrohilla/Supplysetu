@@ -11,7 +11,9 @@ const routes: AppRoute[] = [
   { href: "/delivery", label: "Delivery" },
   { href: "/payments", label: "Payments" },
   { href: "/catalogue", label: "Catalogue" },
-  { href: "/retailer-invites", label: "Retailer Invites" }
+  { href: "/inventory", label: "Inventory" },
+  { href: "/retailers", label: "Retailers" },
+  { href: "/reports", label: "Reports" }
 ];
 
 export function Sidebar() {

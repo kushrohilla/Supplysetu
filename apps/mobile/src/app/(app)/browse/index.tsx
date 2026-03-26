@@ -76,7 +76,18 @@ export default function BrowseProductsScreen() {
           })}
           initialNumToRender={8}
           keyExtractor={(item) => item.id}
-          ListEmptyComponent={<EmptyProductsState />}
+          ListEmptyComponent={
+            <EmptyProductsState
+              onClearSearch={
+                search || selectedBrandId
+                  ? () => {
+                      setSearch("");
+                      setSelectedBrandId(undefined);
+                    }
+                  : undefined
+              }
+            />
+          }
           ListHeaderComponent={
             <View style={{ gap: theme.spacing.md, marginBottom: theme.spacing.md }}>
               <View style={{ gap: theme.spacing.xs }}>

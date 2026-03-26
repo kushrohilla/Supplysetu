@@ -1,29 +1,17 @@
-import { View } from "react-native";
+import { EmptyState } from "@/shared/components/ui/empty-state";
 
-import { AppText } from "@/shared/components/ui/app-text";
-import { useTheme } from "@/shared/theme/theme-context";
+type EmptyProductsStateProps = {
+  onClearSearch?: () => void;
+};
 
-export const EmptyProductsState = () => {
-  const { theme } = useTheme();
-
+export const EmptyProductsState = ({ onClearSearch }: EmptyProductsStateProps) => {
   return (
-    <View
-      style={{
-        paddingVertical: theme.spacing.xxxl,
-        alignItems: "center",
-        gap: theme.spacing.sm
-      }}
-    >
-      <AppText variant="heading">No products found</AppText>
-      <AppText
-        variant="body"
-        style={{
-          color: theme.colors.textMuted,
-          textAlign: "center"
-        }}
-      >
-        Try another brand or search term.
-      </AppText>
-    </View>
+    <EmptyState
+      icon="🔍"
+      title="No matching SKU found"
+      helper="Try browsing by brand instead, or contact your distributor if an item is missing."
+      ctaLabel={onClearSearch ? "Browse by brand" : undefined}
+      onCtaPress={onClearSearch}
+    />
   );
 };

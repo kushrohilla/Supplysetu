@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { catalogueService } from "@/services/catalogue.service";
 import type { Brand, CreateProductPayload, ParsedProductSuggestion, Product } from "@/types/catalogue";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type QuickAddRow = {
   id: string;
@@ -294,373 +295,417 @@ export function CatalogueManagementScreen() {
         </section>
 
         <section className="col-span-9 flex min-h-0 flex-col gap-4">
-          <div className="rounded-lg border border-slate-200 bg-white">
-            <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-              <h2 className="text-sm font-semibold text-slate-900">Product Quick Add Table</h2>
-              <div className="text-xs text-slate-500">
-                Brand: <span className="font-medium text-slate-700">{selectedBrand?.name ?? "-"}</span>
-              </div>
-            </header>
-            <div className="overflow-auto">
-              <table className="w-full border-collapse text-xs">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
-                    <th className="border-b border-slate-200 px-2 py-2">Product Name</th>
-                    <th className="border-b border-slate-200 px-2 py-2">Variant / Pack Size</th>
-                    <th className="border-b border-slate-200 px-2 py-2">Base Selling Price</th>
-                    <th className="border-b border-slate-200 px-2 py-2">MRP</th>
-                    <th className="border-b border-slate-200 px-2 py-2">Opening Stock</th>
-                    <th className="border-b border-slate-200 px-2 py-2">Active</th>
-                    <th className="border-b border-slate-200 px-2 py-2">Row</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quickAddRows.map((row) => (
-                    <tr key={row.id} className="border-b border-slate-100">
-                      <td className="px-2 py-2">
-                        <input
-                          value={row.productName}
-                          onChange={(event) =>
-                            updateQuickRow(row.id, (current) => ({
-                              ...current,
-                              productName: event.target.value
-                            }))
-                          }
-                          className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          value={row.variantPackSize}
-                          onChange={(event) =>
-                            updateQuickRow(row.id, (current) => ({
-                              ...current,
-                              variantPackSize: event.target.value
-                            }))
-                          }
-                          className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          value={row.baseSellingPrice}
-                          onChange={(event) =>
-                            updateQuickRow(row.id, (current) => ({
-                              ...current,
-                              baseSellingPrice: Math.max(0, Number(event.target.value))
-                            }))
-                          }
-                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          value={row.mrp}
-                          onChange={(event) =>
-                            updateQuickRow(row.id, (current) => ({
-                              ...current,
-                              mrp: Math.max(0, Number(event.target.value))
-                            }))
-                          }
-                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          value={row.openingStock}
-                          onChange={(event) =>
-                            updateQuickRow(row.id, (current) => ({
-                              ...current,
-                              openingStock: Math.max(0, Number(event.target.value))
-                            }))
-                          }
-                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="checkbox"
-                          checked={row.isActive}
-                          onChange={(event) =>
-                            updateQuickRow(row.id, (current) => ({
-                              ...current,
-                              isActive: event.target.checked
-                            }))
-                          }
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setQuickAddRows((previous) => previous.filter((item) => item.id !== row.id))
-                          }
-                          className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {!loadingBrands && brands.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center p-8">
+              <EmptyState
+                icon="📦"
+                title="Your catalog is empty"
+                helper="Add your first brand to start building your product catalog."
+                ctaLabel="Add brand"
+                onCtaPress={() => {
+                  const input = document.querySelector('input[placeholder="New brand name"]') as HTMLInputElement;
+                  if (input) input.focus();
+                }}
+                hint={
+                  <>
+                    <p className="mb-2 font-medium text-slate-800">Catalog structure:</p>
+                    <div className="rounded-md bg-slate-100 p-3 pt-4 font-mono text-[11px] leading-relaxed text-slate-700">
+                      <div>Brand  →  Product  →  SKU</div>
+                      <div className="mt-2 grid grid-cols-[60px_1fr] gap-x-2">
+                        <div className="font-semibold text-slate-900">Amul</div>
+                        <div>
+                          <div className="grid grid-cols-[80px_1fr] gap-x-2">
+                            <div className="font-medium">Butter</div>
+                            <div>
+                              <div>500g pack</div>
+                              <div>200g pack</div>
+                            </div>
+                          </div>
+                          <div className="mt-1 grid grid-cols-[80px_1fr] gap-x-2">
+                            <div className="font-medium">Cheese</div>
+                            <div>1kg block</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 border-t border-slate-200 pt-2 text-slate-500">
+                        Each SKU gets its own price, stock, and scheme mapping.
+                      </div>
+                    </div>
+                  </>
+                }
+              />
             </div>
-            <div className="flex items-center gap-2 border-t border-slate-200 p-3">
-              <button
-                type="button"
-                onClick={() => setQuickAddRows((previous) => [...previous, createQuickRow()])}
-                className="rounded border border-slate-300 px-3 py-1.5 text-xs"
-              >
-                Add Row
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveQuickProducts()}
-                disabled={saving}
-                className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-              >
-                Save Products
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <section className="rounded-lg border border-slate-200 bg-white">
-              <header className="border-b border-slate-200 px-3 py-2">
-                <h3 className="text-sm font-semibold text-slate-900">Catalogue Upload Assist</h3>
-              </header>
-              <div className="space-y-3 p-3">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) {
-                      return;
-                    }
-                    parseCataloguePdf(file);
-                  }}
-                  className="w-full text-xs"
-                />
-                {selectedPdfName ? (
-                  <div className="text-xs text-slate-600">Parsed File: {selectedPdfName}</div>
-                ) : null}
-                <div className="max-h-56 overflow-auto">
+          ) : (
+            <>
+              <div className="rounded-lg border border-slate-200 bg-white">
+                <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+                  <h2 className="text-sm font-semibold text-slate-900">Product Quick Add Table</h2>
+                  <div className="text-xs text-slate-500">
+                    Brand: <span className="font-medium text-slate-700">{selectedBrand?.name ?? "-"}</span>
+                  </div>
+                </header>
+                <div className="overflow-auto">
                   <table className="w-full border-collapse text-xs">
-                    <thead className="sticky top-0 bg-slate-50 text-left text-slate-600">
+                    <thead className="bg-slate-50 text-left text-slate-600">
                       <tr>
-                        <th className="border-b border-slate-200 px-2 py-2">Name</th>
-                        <th className="border-b border-slate-200 px-2 py-2">Pack</th>
-                        <th className="border-b border-slate-200 px-2 py-2">Price</th>
+                        <th className="border-b border-slate-200 px-2 py-2">Product Name</th>
+                        <th className="border-b border-slate-200 px-2 py-2">Variant / Pack Size</th>
+                        <th className="border-b border-slate-200 px-2 py-2">Base Selling Price</th>
                         <th className="border-b border-slate-200 px-2 py-2">MRP</th>
-                        <th className="border-b border-slate-200 px-2 py-2">Stock</th>
-                        <th className="border-b border-slate-200 px-2 py-2">Status</th>
+                        <th className="border-b border-slate-200 px-2 py-2">Opening Stock</th>
+                        <th className="border-b border-slate-200 px-2 py-2">Active</th>
+                        <th className="border-b border-slate-200 px-2 py-2">Row</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {suggestions.map((row) => (
+                      {quickAddRows.map((row) => (
                         <tr key={row.id} className="border-b border-slate-100">
                           <td className="px-2 py-2">
                             <input
                               value={row.productName}
                               onChange={(event) =>
-                                setSuggestions((previous) =>
-                                  previous.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          productName: event.target.value
-                                        }
-                                      : item
-                                  )
-                                )
+                                updateQuickRow(row.id, (current) => ({
+                                  ...current,
+                                  productName: event.target.value
+                                }))
                               }
-                              className="w-full rounded border border-slate-300 px-1 py-1"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
                             />
                           </td>
                           <td className="px-2 py-2">
                             <input
                               value={row.variantPackSize}
                               onChange={(event) =>
-                                setSuggestions((previous) =>
-                                  previous.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          variantPackSize: event.target.value
-                                        }
-                                      : item
-                                  )
-                                )
+                                updateQuickRow(row.id, (current) => ({
+                                  ...current,
+                                  variantPackSize: event.target.value
+                                }))
                               }
-                              className="w-full rounded border border-slate-300 px-1 py-1"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
                             />
                           </td>
                           <td className="px-2 py-2">
                             <input
                               type="number"
+                              min={0}
                               value={row.baseSellingPrice}
                               onChange={(event) =>
-                                setSuggestions((previous) =>
-                                  previous.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          baseSellingPrice: Math.max(0, Number(event.target.value))
-                                        }
-                                      : item
-                                  )
-                                )
+                                updateQuickRow(row.id, (current) => ({
+                                  ...current,
+                                  baseSellingPrice: Math.max(0, Number(event.target.value))
+                                }))
                               }
-                              className="w-16 rounded border border-slate-300 px-1 py-1"
+                              className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
                             />
                           </td>
                           <td className="px-2 py-2">
                             <input
                               type="number"
+                              min={0}
                               value={row.mrp}
                               onChange={(event) =>
-                                setSuggestions((previous) =>
-                                  previous.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          mrp: Math.max(0, Number(event.target.value))
-                                        }
-                                      : item
-                                  )
-                                )
+                                updateQuickRow(row.id, (current) => ({
+                                  ...current,
+                                  mrp: Math.max(0, Number(event.target.value))
+                                }))
                               }
-                              className="w-16 rounded border border-slate-300 px-1 py-1"
+                              className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
                             />
                           </td>
                           <td className="px-2 py-2">
                             <input
                               type="number"
+                              min={0}
                               value={row.openingStock}
                               onChange={(event) =>
-                                setSuggestions((previous) =>
-                                  previous.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          openingStock: Math.max(0, Number(event.target.value))
-                                        }
-                                      : item
-                                  )
-                                )
+                                updateQuickRow(row.id, (current) => ({
+                                  ...current,
+                                  openingStock: Math.max(0, Number(event.target.value))
+                                }))
                               }
-                              className="w-16 rounded border border-slate-300 px-1 py-1"
+                              className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
                             />
                           </td>
                           <td className="px-2 py-2">
-                            <select
-                              value={row.status}
+                            <input
+                              type="checkbox"
+                              checked={row.isActive}
                               onChange={(event) =>
-                                setSuggestions((previous) =>
-                                  previous.map((item) =>
-                                    item.id === row.id
-                                      ? {
-                                          ...item,
-                                          status: event.target.value as ParsedProductSuggestion["status"]
-                                        }
-                                      : item
-                                  )
-                                )
+                                updateQuickRow(row.id, (current) => ({
+                                  ...current,
+                                  isActive: event.target.checked
+                                }))
                               }
-                              className="rounded border border-slate-300 px-1 py-1"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuickAddRows((previous) => previous.filter((item) => item.id !== row.id))
+                              }
+                              className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600"
                             >
-                              <option value="PENDING">Pending</option>
-                              <option value="ACCEPTED">Accept</option>
-                              <option value="REJECTED">Reject</option>
-                            </select>
+                              Remove
+                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void bulkCreateAccepted()}
-                  disabled={saving}
-                  className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-                >
-                  Bulk Create Accepted ({acceptedSuggestions.length})
-                </button>
+                <div className="flex items-center gap-2 border-t border-slate-200 p-3">
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddRows((previous) => [...previous, createQuickRow()])}
+                    className="rounded border border-slate-300 px-3 py-1.5 text-xs"
+                  >
+                    Add Row
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveQuickProducts()}
+                    disabled={saving}
+                    className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                  >
+                    Save Products
+                  </button>
+                </div>
               </div>
-            </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white">
-              <header className="border-b border-slate-200 px-3 py-2">
-                <h3 className="text-sm font-semibold text-slate-900">Product Images</h3>
-              </header>
-              <div className="space-y-3 p-3">
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setBulkDropActive(true);
-                  }}
-                  onDragLeave={() => setBulkDropActive(false)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setBulkDropActive(false);
-                    const files = Array.from(event.dataTransfer.files ?? []);
-                    void uploadBulkImages(files);
-                  }}
-                  className={[
-                    "rounded border-2 border-dashed p-4 text-center text-xs",
-                    bulkDropActive ? "border-slate-500 bg-slate-50" : "border-slate-300 text-slate-500"
-                  ].join(" ")}
-                >
-                  Drag & drop product images here (bulk upload placeholder)
-                </div>
-                <div className="max-h-52 overflow-auto">
-                  {loadingProducts ? (
-                    <div className="text-xs text-slate-500">Loading products...</div>
-                  ) : (
-                    <table className="w-full border-collapse text-xs">
-                      <thead className="sticky top-0 bg-slate-50 text-left text-slate-600">
-                        <tr>
-                          <th className="border-b border-slate-200 px-2 py-2">Product</th>
-                          <th className="border-b border-slate-200 px-2 py-2">Pack</th>
-                          <th className="border-b border-slate-200 px-2 py-2">Upload Image</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((product) => (
-                          <tr key={product.id} className="border-b border-slate-100">
-                            <td className="px-2 py-2 text-slate-700">{product.productName}</td>
-                            <td className="px-2 py-2 text-slate-600">{product.variantPackSize}</td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(event) => {
-                                  const file = event.target.files?.[0];
-                                  if (!file) {
-                                    return;
-                                  }
-                                  void uploadSingleImage(file);
-                                }}
-                                className="w-full text-[11px]"
-                              />
-                            </td>
+              <div className="grid grid-cols-2 gap-4">
+                <section className="rounded-lg border border-slate-200 bg-white">
+                  <header className="border-b border-slate-200 px-3 py-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Catalogue Upload Assist</h3>
+                  </header>
+                  <div className="space-y-3 p-3">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) {
+                          return;
+                        }
+                        parseCataloguePdf(file);
+                      }}
+                      className="w-full text-xs"
+                    />
+                    {selectedPdfName ? (
+                      <div className="text-xs text-slate-600">Parsed File: {selectedPdfName}</div>
+                    ) : null}
+                    <div className="max-h-56 overflow-auto">
+                      <table className="w-full border-collapse text-xs">
+                        <thead className="sticky top-0 bg-slate-50 text-left text-slate-600">
+                          <tr>
+                            <th className="border-b border-slate-200 px-2 py-2">Name</th>
+                            <th className="border-b border-slate-200 px-2 py-2">Pack</th>
+                            <th className="border-b border-slate-200 px-2 py-2">Price</th>
+                            <th className="border-b border-slate-200 px-2 py-2">MRP</th>
+                            <th className="border-b border-slate-200 px-2 py-2">Stock</th>
+                            <th className="border-b border-slate-200 px-2 py-2">Status</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                        </thead>
+                        <tbody>
+                          {suggestions.map((row) => (
+                            <tr key={row.id} className="border-b border-slate-100">
+                              <td className="px-2 py-2">
+                                <input
+                                  value={row.productName}
+                                  onChange={(event) =>
+                                    setSuggestions((previous) =>
+                                      previous.map((item) =>
+                                        item.id === row.id
+                                          ? {
+                                              ...item,
+                                              productName: event.target.value
+                                            }
+                                          : item
+                                      )
+                                    )
+                                  }
+                                  className="w-full rounded border border-slate-300 px-1 py-1"
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  value={row.variantPackSize}
+                                  onChange={(event) =>
+                                    setSuggestions((previous) =>
+                                      previous.map((item) =>
+                                        item.id === row.id
+                                          ? {
+                                              ...item,
+                                              variantPackSize: event.target.value
+                                            }
+                                          : item
+                                      )
+                                    )
+                                  }
+                                  className="w-full rounded border border-slate-300 px-1 py-1"
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  value={row.baseSellingPrice}
+                                  onChange={(event) =>
+                                    setSuggestions((previous) =>
+                                      previous.map((item) =>
+                                        item.id === row.id
+                                          ? {
+                                              ...item,
+                                              baseSellingPrice: Math.max(0, Number(event.target.value))
+                                            }
+                                          : item
+                                      )
+                                    )
+                                  }
+                                  className="w-16 rounded border border-slate-300 px-1 py-1"
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  value={row.mrp}
+                                  onChange={(event) =>
+                                    setSuggestions((previous) =>
+                                      previous.map((item) =>
+                                        item.id === row.id
+                                          ? {
+                                              ...item,
+                                              mrp: Math.max(0, Number(event.target.value))
+                                            }
+                                          : item
+                                      )
+                                    )
+                                  }
+                                  className="w-16 rounded border border-slate-300 px-1 py-1"
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  value={row.openingStock}
+                                  onChange={(event) =>
+                                    setSuggestions((previous) =>
+                                      previous.map((item) =>
+                                        item.id === row.id
+                                          ? {
+                                              ...item,
+                                              openingStock: Math.max(0, Number(event.target.value))
+                                            }
+                                          : item
+                                      )
+                                    )
+                                  }
+                                  className="w-16 rounded border border-slate-300 px-1 py-1"
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <select
+                                  value={row.status}
+                                  onChange={(event) =>
+                                    setSuggestions((previous) =>
+                                      previous.map((item) =>
+                                        item.id === row.id
+                                          ? {
+                                              ...item,
+                                              status: event.target.value as ParsedProductSuggestion["status"]
+                                            }
+                                          : item
+                                      )
+                                    )
+                                  }
+                                  className="rounded border border-slate-300 px-1 py-1"
+                                >
+                                  <option value="PENDING">Pending</option>
+                                  <option value="ACCEPTED">Accept</option>
+                                  <option value="REJECTED">Reject</option>
+                                </select>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void bulkCreateAccepted()}
+                      disabled={saving}
+                      className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                    >
+                      Bulk Create Accepted ({acceptedSuggestions.length})
+                    </button>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-slate-200 bg-white">
+                  <header className="border-b border-slate-200 px-3 py-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Product Images</h3>
+                  </header>
+                  <div className="space-y-3 p-3">
+                    <div
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setBulkDropActive(true);
+                      }}
+                      onDragLeave={() => setBulkDropActive(false)}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        setBulkDropActive(false);
+                        const files = Array.from(event.dataTransfer.files ?? []);
+                        void uploadBulkImages(files);
+                      }}
+                      className={[
+                        "rounded border-2 border-dashed p-4 text-center text-xs",
+                        bulkDropActive ? "border-slate-500 bg-slate-50" : "border-slate-300 text-slate-500"
+                      ].join(" ")}
+                    >
+                      Drag & drop product images here (bulk upload placeholder)
+                    </div>
+                    <div className="max-h-52 overflow-auto">
+                      {loadingProducts ? (
+                        <div className="text-xs text-slate-500">Loading products...</div>
+                      ) : (
+                        <table className="w-full border-collapse text-xs">
+                          <thead className="sticky top-0 bg-slate-50 text-left text-slate-600">
+                            <tr>
+                              <th className="border-b border-slate-200 px-2 py-2">Product</th>
+                              <th className="border-b border-slate-200 px-2 py-2">Pack</th>
+                              <th className="border-b border-slate-200 px-2 py-2">Upload Image</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {products.map((product) => (
+                              <tr key={product.id} className="border-b border-slate-100">
+                                <td className="px-2 py-2 text-slate-700">{product.productName}</td>
+                                <td className="px-2 py-2 text-slate-600">{product.variantPackSize}</td>
+                                <td className="px-2 py-2">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(event) => {
+                                      const file = event.target.files?.[0];
+                                      if (!file) {
+                                        return;
+                                      }
+                                      void uploadSingleImage(file);
+                                    }}
+                                    className="w-full text-[11px]"
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                </section>
               </div>
-            </section>
-          </div>
+            </>
+          )}
         </section>
       </div>
     </div>
