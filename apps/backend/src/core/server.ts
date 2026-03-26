@@ -2,10 +2,40 @@ import { initializeDatabase, runMigrations } from "../../../../packages/database
 import { buildApp } from "./app";
 import { env, logger } from "./config";
 
+const describeDatabaseTarget = (databaseUrl: string) => {
+  try {
+    const parsed = new URL(databaseUrl);
+
+    return {
+      protocol: parsed.protocol.replace(":", ""),
+      host: parsed.hostname,
+      port: parsed.port || "5432",
+      database: parsed.pathname.replace(/^\//, "") || "unknown",
+    };
+  } catch {
+    return {
+      protocol: "unknown",
+      host: "unknown",
+      port: "unknown",
+      database: "unknown",
+    };
+  }
+};
+
 const start = async () => {
   const PORT = Number(process.env.PORT || env.PORT || 5000);
 
   try {
+    logger.info(
+      {
+        nodeEnv: env.NODE_ENV,
+        port: PORT,
+        dbSsl: env.DB_SSL,
+        databaseTarget: describeDatabaseTarget(env.DATABASE_URL),
+      },
+      "Starting backend bootstrap",
+    );
+
     // Initialize the shared Knex instance before the app is created.
     const db = initializeDatabase(env);
 
@@ -20,7 +50,14 @@ const start = async () => {
     });
     logger.info({ port: PORT }, "Backend server started");
   } catch (error) {
-    logger.error({ err: error }, "Failed to start backend server");
+    logger.error(
+      {
+        err: error,
+        reason: error instanceof Error ? error.message : "Unknown startup error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      "Failed to start backend server",
+    );
     process.exit(1);
   }
 };

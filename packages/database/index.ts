@@ -64,6 +64,7 @@ export const runMigrations = async (db: Knex, logger: DatabaseLogger): Promise<v
       {
         err: error,
         reason: error instanceof Error ? error.message : "Unknown migration failure",
+        stack: error instanceof Error ? error.stack : undefined,
       },
       "Database migration failed",
     );
