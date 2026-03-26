@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getApiErrorMessage } from "@/services/auth.service";
 import { catalogueService } from "@/services/catalogue.service";
 import type { Brand, CreateProductPayload, ParsedProductSuggestion, Product } from "@/types/catalogue";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -29,6 +31,7 @@ const formatDateTime = (iso: string): string =>
   new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export function CatalogueManagementScreen() {
+  const router = useRouter();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<string>("");
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,12 +114,22 @@ export function CatalogueManagementScreen() {
       setBrands((previous) => [created, ...previous]);
       setSelectedBrandId(created.id);
       setNewBrandName("");
-      setMessage("Brand created.");
-    } catch {
-      setError("Unable to create brand.");
+      setMessage("Brand created successfully.");
+      router.replace("/catalogue");
+    } catch (brandError) {
+      setError(getApiErrorMessage(brandError, "Unable to create brand."));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleBrandSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving) {
+      return;
+    }
+
+    await addBrand();
   };
 
   const saveQuickProducts = async () => {
@@ -152,8 +165,8 @@ export function CatalogueManagementScreen() {
       setQuickAddRows([createQuickRow()]);
       setMessage(`${created.length} products created.`);
       await loadBrands();
-    } catch {
-      setError("Failed to create products.");
+    } catch (productError) {
+      setError(getApiErrorMessage(productError, "Failed to create products."));
     } finally {
       setSaving(false);
     }
@@ -186,8 +199,8 @@ export function CatalogueManagementScreen() {
       setSelectedPdfName("");
       setMessage(`${created.length} products created from parsed catalogue.`);
       await loadBrands();
-    } catch {
-      setError("Failed bulk product creation.");
+    } catch (bulkError) {
+      setError(getApiErrorMessage(bulkError, "Failed bulk product creation."));
     } finally {
       setSaving(false);
     }
@@ -204,8 +217,8 @@ export function CatalogueManagementScreen() {
     try {
       await catalogueService.uploadProductImages(selectedBrandId, [file]);
       setMessage(`Uploaded image: ${file.name}`);
-    } catch {
-      setError("Image upload failed.");
+    } catch (imageError) {
+      setError(getApiErrorMessage(imageError, "Image upload failed."));
     } finally {
       setSaving(false);
     }
@@ -221,8 +234,8 @@ export function CatalogueManagementScreen() {
     try {
       await catalogueService.uploadProductImages(selectedBrandId, files);
       setMessage(`${files.length} image files processed.`);
-    } catch {
-      setError("Bulk image upload failed.");
+    } catch (bulkImageError) {
+      setError(getApiErrorMessage(bulkImageError, "Bulk image upload failed."));
     } finally {
       setSaving(false);
     }
@@ -245,7 +258,7 @@ export function CatalogueManagementScreen() {
           <header className="border-b border-slate-200 px-3 py-2">
             <h2 className="text-sm font-semibold text-slate-900">Brand Management</h2>
           </header>
-          <div className="flex gap-2 border-b border-slate-200 p-3">
+          <form className="flex gap-2 border-b border-slate-200 p-3" onSubmit={(event) => void handleBrandSubmit(event)}>
             <input
               value={newBrandName}
               onChange={(event) => setNewBrandName(event.target.value)}
@@ -253,14 +266,13 @@ export function CatalogueManagementScreen() {
               className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm"
             />
             <button
-              type="button"
-              onClick={() => void addBrand()}
+              type="submit"
               disabled={saving}
               className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
             >
-              Add New Brand
+              {saving ? "Adding..." : "Add New Brand"}
             </button>
-          </div>
+          </form>
           <div className="min-h-0 flex-1 overflow-auto">
             {loadingBrands ? (
               <div className="p-3 text-sm text-slate-500">Loading brands...</div>

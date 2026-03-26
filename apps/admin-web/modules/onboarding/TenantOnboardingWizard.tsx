@@ -9,10 +9,7 @@ import type {
   StaffUser,
   TenantOnboardingState
 } from "@/types/onboarding";
-import {
-  ONBOARDING_COMPLETE_COOKIE_NAME,
-  ONBOARDING_COMPLETE_COOKIE_VALUE
-} from "@/services/session.constants";
+import { setTenantOnboardingComplete } from "@/services/onboarding.service";
 
 const STORAGE_KEY = "tenant_onboarding_progress_v1";
 
@@ -220,7 +217,7 @@ export function TenantOnboardingWizard() {
     }
 
     updateState((current) => ({ ...current, onboardingComplete: true }));
-    document.cookie = `${ONBOARDING_COMPLETE_COOKIE_NAME}=${ONBOARDING_COMPLETE_COOKIE_VALUE}; path=/`;
+    setTenantOnboardingComplete();
     localStorage.removeItem(STORAGE_KEY);
     setMessage("Onboarding complete. Redirecting to operations dashboard...");
     setWarning(null);

@@ -7,7 +7,8 @@ export const registerAuthRoutes = async (fastify: FastifyInstance) => {
   const controller = new AuthController();
   const authenticate = buildAuthMiddleware();
 
-  fastify.post("/auth/login", controller.requestOtp.bind(controller));
+  fastify.post("/auth/login", controller.login.bind(controller));
+  fastify.post("/auth/register", controller.registerDistributor.bind(controller));
   fastify.post("/auth/verify", controller.verifyOtp.bind(controller));
   fastify.post("/auth/refresh", controller.refreshToken.bind(controller));
   fastify.get("/auth/distributors", { preHandler: authenticate }, controller.getDistributors.bind(controller));

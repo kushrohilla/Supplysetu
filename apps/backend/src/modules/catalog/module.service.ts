@@ -8,7 +8,9 @@ export class CatalogService {
     return brands.map((brand) => ({
       id: String(brand.id),
       name: brand.name,
+      totalProductCount: Number(brand.sku_count ?? 0),
       skuCount: Number(brand.sku_count ?? 0),
+      updatedAt: brand.updated_at ? new Date(brand.updated_at).toISOString() : new Date().toISOString(),
     }));
   }
 
@@ -68,5 +70,54 @@ export class CatalogService {
 
   async getStockBatch(tenantId: string, productIds: string[]) {
     return this.catalogRepository.getLatestStockMap(tenantId, productIds);
+  }
+
+  async createBrand(name: string) {
+    const existing = await this.catalogRepository.findBrandByName(name);
+    if (existing) {
+      return {
+        id: String(existing.id),
+        name: existing.name,
+        totalProductCount: 0,
+        skuCount: 0,
+        updatedAt: existing.updated_at ? new Date(existing.updated_at).toISOString() : new Date().toISOString(),
+      };
+    }
+
+    const created = await this.catalogRepository.createBrand(name);
+    return {
+      id: String(created?.id),
+      name: created?.name ?? name,
+      totalProductCount: 0,
+      skuCount: 0,
+      updatedAt: created?.updated_at ? new Date(created.updated_at).toISOString() : new Date().toISOString(),
+    };
+  }
+
+  async createProducts(
+    tenantId: string,
+    products: Array<{
+      brandId: string;
+      productName: string;
+      variantPackSize: string;
+      baseSellingPrice: number;
+      mrp: number;
+      openingStock: number;
+      isActive: boolean;
+    }>,
+  ) {
+    const created = await this.catalogRepository.createTenantProducts(tenantId, products);
+    return created.map((product) => ({
+      id: String(product.id),
+      brandId: String(product.brand_id),
+      productName: product.name,
+      variantPackSize: product.pack_size,
+      baseSellingPrice: Number(product.base_price),
+      mrp: Number(product.base_price),
+      openingStock: products.find((row) => row.productName === product.name && row.variantPackSize === product.pack_size)?.openingStock ?? 0,
+      isActive: true,
+      imageUrl: null,
+      createdAt: new Date().toISOString(),
+    }));
   }
 }

@@ -2,7 +2,14 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { HTTP_STATUS } from "../../shared/constants/http-status";
 import { AppError } from "../../shared/errors/app-error";
-import { productsQuerySchema, searchQuerySchema, stockBatchSchema, tenantQuerySchema } from "./module.schema";
+import {
+  createBrandSchema,
+  createProductsSchema,
+  productsQuerySchema,
+  searchQuerySchema,
+  stockBatchSchema,
+  tenantQuerySchema,
+} from "./module.schema";
 
 export class CatalogController {
   async getBrands(request: FastifyRequest, reply: FastifyReply) {
@@ -42,5 +49,17 @@ export class CatalogController {
     const payload = stockBatchSchema.parse(request.body);
     const stock = await request.server.container.catalogService.getStockBatch(payload.tenant_id, payload.product_ids);
     return reply.send({ success: true, data: stock });
+  }
+
+  async createBrand(request: FastifyRequest, reply: FastifyReply) {
+    const payload = createBrandSchema.parse(request.body);
+    const brand = await request.server.container.catalogService.createBrand(payload.name);
+    return reply.status(HTTP_STATUS.CREATED).send({ success: true, data: brand });
+  }
+
+  async createProducts(request: FastifyRequest, reply: FastifyReply) {
+    const payload = createProductsSchema.parse(request.body);
+    const products = await request.server.container.catalogService.createProducts(payload.tenant_id, payload.products);
+    return reply.status(HTTP_STATUS.CREATED).send({ success: true, data: products });
   }
 }

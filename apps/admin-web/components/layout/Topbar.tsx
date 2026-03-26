@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AUTH_COOKIE_NAME } from "@/services/session.constants";
+import { clearAuthSession } from "@/services/auth.service";
 
 export function Topbar() {
   const router = useRouter();
 
   const handleLogout = () => {
-    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    clearAuthSession();
     router.replace("/login");
     router.refresh();
   };

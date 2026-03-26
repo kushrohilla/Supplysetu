@@ -1,11 +1,24 @@
-import { cookies } from "next/headers";
+"use client";
+
 import {
-  ONBOARDING_COMPLETE_COOKIE_NAME,
-  ONBOARDING_COMPLETE_COOKIE_VALUE
+  ONBOARDING_COMPLETE_STORAGE_KEY,
+  ONBOARDING_COMPLETE_STORAGE_VALUE,
 } from "@/services/session.constants";
 
-export async function isTenantOnboardingComplete(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const status = cookieStore.get(ONBOARDING_COMPLETE_COOKIE_NAME)?.value;
-  return status === ONBOARDING_COMPLETE_COOKIE_VALUE;
-}
+const canUseStorage = () => typeof window !== "undefined";
+
+export const isTenantOnboardingComplete = (): boolean => {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  return window.localStorage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) === ONBOARDING_COMPLETE_STORAGE_VALUE;
+};
+
+export const setTenantOnboardingComplete = () => {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, ONBOARDING_COMPLETE_STORAGE_VALUE);
+};

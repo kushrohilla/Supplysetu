@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ONBOARDING_COMPLETE_COOKIE_NAME, ONBOARDING_COMPLETE_COOKIE_VALUE } from "@/services/session.constants";
+import { setTenantOnboardingComplete } from "@/services/onboarding.service";
 
 type ActivationWelcomeScreenProps = {
   companyName: string;
@@ -81,7 +81,7 @@ export function ActivationWelcomeScreen({
   const nextIncompleteStep = steps.find((s) => !s.isComplete);
 
   const completeOnboarding = () => {
-    document.cookie = `${ONBOARDING_COMPLETE_COOKIE_NAME}=${ONBOARDING_COMPLETE_COOKIE_VALUE}; path=/`;
+    setTenantOnboardingComplete();
     router.replace("/review-orders");
     router.refresh();
   };

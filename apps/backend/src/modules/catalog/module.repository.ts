@@ -1,15 +1,25 @@
+import crypto from "crypto";
+import type { Knex } from "knex";
+
 import { BaseRepository } from "../../shared/base-repository";
 
 export class CatalogRepository extends BaseRepository {
   async listBrands(tenantId: string) {
-    return this.db("tenant_products")
-      .leftJoin("global_brands", "tenant_products.brand_id", "global_brands.id")
-      .where("tenant_products.tenant_id", tenantId)
-      .where("tenant_products.status", "active")
-      .groupBy("global_brands.id", "global_brands.name")
+    const tenantIdBinding = this.db.raw("?", [tenantId]);
+    const activeStatusBinding = this.db.raw("?", ["active"]);
+
+    return this.db("global_brands")
+      .leftJoin("tenant_products", function joinTenantProducts() {
+        this.on("global_brands.id", "tenant_products.brand_id")
+          .andOn("tenant_products.tenant_id", "=", tenantIdBinding)
+          .andOn("tenant_products.status", "=", activeStatusBinding);
+      })
+      .where("global_brands.is_active", true)
+      .groupBy("global_brands.id", "global_brands.name", "global_brands.updated_at")
       .select(
         "global_brands.id",
         "global_brands.name",
+        "global_brands.updated_at",
         this.db.raw("COUNT(tenant_products.id) as sku_count"),
       )
       .orderBy("global_brands.name", "asc");
@@ -104,5 +114,103 @@ export class CatalogRepository extends BaseRepository {
     }
 
     return stockMap;
+  }
+
+  async findBrandByName(name: string) {
+    return this.db("global_brands")
+      .whereRaw("LOWER(name) = ?", [name.trim().toLowerCase()])
+      .first("id", "name", "updated_at");
+  }
+
+  async createBrand(name: string) {
+    const brand = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      source: "admin-web",
+      is_active: true,
+      created_at: this.db.fn.now(),
+      updated_at: this.db.fn.now(),
+    };
+
+    await this.db("global_brands").insert(brand);
+
+    return this.db("global_brands")
+      .where({ id: brand.id })
+      .first("id", "name", "updated_at");
+  }
+
+  async createTenantProducts(
+    tenantId: string,
+    products: Array<{
+      brandId: string;
+      productName: string;
+      variantPackSize: string;
+      baseSellingPrice: number;
+      mrp: number;
+      openingStock: number;
+      isActive: boolean;
+    }>,
+  ) {
+    return this.db.transaction(async (trx: Knex.Transaction) => {
+      const createdProducts: Array<{
+        id: string;
+        brand_id: string;
+        brand_name?: string | null;
+        name: string;
+        pack_size: string;
+        base_price: number;
+        advance_price: number;
+      }> = [];
+
+      for (const product of products) {
+        const tenantProductId = crypto.randomUUID();
+        const skuCode = `SKU-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+        await trx("tenant_products").insert({
+          id: tenantProductId,
+          tenant_id: tenantId,
+          brand_id: product.brandId,
+          product_name: product.productName.trim(),
+          pack_size: product.variantPackSize.trim(),
+          sku_code: skuCode,
+          base_price: product.baseSellingPrice,
+          advance_price: product.baseSellingPrice,
+          status: product.isActive ? "active" : "inactive",
+          performance_band: "new",
+          opening_stock_snapshot: product.openingStock,
+          created_at: trx.fn.now(),
+          updated_at: trx.fn.now(),
+        });
+
+        await trx("tenant_product_stock_snapshots").insert({
+          id: crypto.randomUUID(),
+          tenant_id: tenantId,
+          tenant_product_id: tenantProductId,
+          stock_qty: product.openingStock,
+          source: "admin-web",
+          captured_at: trx.fn.now(),
+          created_at: trx.fn.now(),
+        });
+
+        const created = await trx("tenant_products")
+          .leftJoin("global_brands", "tenant_products.brand_id", "global_brands.id")
+          .where("tenant_products.id", tenantProductId)
+          .first(
+            "tenant_products.id",
+            "tenant_products.brand_id",
+            "tenant_products.product_name as name",
+            "tenant_products.pack_size",
+            "tenant_products.base_price",
+            "tenant_products.advance_price",
+            "global_brands.name as brand_name",
+          );
+
+        if (created) {
+          createdProducts.push(created);
+        }
+      }
+
+      return createdProducts;
+    });
   }
 }

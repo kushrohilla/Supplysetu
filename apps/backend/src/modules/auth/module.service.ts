@@ -1,9 +1,16 @@
 import crypto from "crypto";
 
 import jwt from "jsonwebtoken";
+import type { Knex } from "knex";
 
 import type { DistributorRepository } from "../distributor/module.repository";
-import type { RetailerRecord, RetailerRepository } from "./module.repository";
+import type {
+  AdminAuthRecord,
+  AdminTenantRecord,
+  AdminUserRecord,
+  RetailerRecord,
+  RetailerRepository,
+} from "./module.repository";
 
 type TokenPayload = {
   retailerId: string;
@@ -11,10 +18,19 @@ type TokenPayload = {
   tenantIds: string[];
 };
 
+type AdminTokenPayload = {
+  userId: string;
+  tenantId: string;
+  role: string;
+  mobileNumber: string;
+  tokenType: "admin";
+};
+
 const otpStore = new Map<string, string>();
 
 export class AuthService {
   constructor(
+    private readonly db: Knex,
     private readonly retailerRepository: RetailerRepository,
     private readonly distributorRepository: DistributorRepository,
   ) {}
@@ -79,6 +95,63 @@ export class AuthService {
     return this.retailerRepository.update(retailerId, input);
   }
 
+  async registerDistributor(input: {
+    distributor_name: string;
+    owner_name: string;
+    mobile_number: string;
+    gst_number: string;
+    full_address: string;
+    password: string;
+  }) {
+    const existingTenant = await this.retailerRepository.findTenantByNameOrMobile(
+      input.distributor_name,
+      input.mobile_number,
+    );
+
+    if (existingTenant) {
+      return null;
+    }
+
+    const tenantCode = this.generateTenantCode(input.distributor_name);
+    const passwordHash = this.hashPassword(input.password);
+    const tenantId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
+    const created = await this.db.transaction(async (trx: Knex.Transaction) => {
+      return this.retailerRepository.createDistributorAdmin(
+        {
+          tenantId,
+          tenantCode,
+          distributorName: input.distributor_name.trim(),
+          ownerName: input.owner_name.trim(),
+          mobileNumber: input.mobile_number.trim(),
+          gstNumber: input.gst_number.trim().toUpperCase(),
+          fullAddress: input.full_address.trim(),
+          userId,
+          username: input.distributor_name.trim(),
+          email: `${input.mobile_number.trim()}@supplysetu.local`,
+          passwordHash,
+          role: "distributor_admin",
+        },
+        trx,
+      );
+    });
+
+    return this.buildAdminAuthResponse(created);
+  }
+
+  async loginDistributor(identifier: string, password: string) {
+    const authRecord = await this.retailerRepository.findAdminAuthRecordByIdentifier(identifier);
+    if (!authRecord || !authRecord.user.is_active || !authRecord.tenant.is_active) {
+      return null;
+    }
+
+    if (!this.verifyPassword(password, authRecord.user.password_hash)) {
+      return null;
+    }
+
+    return this.buildAdminAuthResponse(authRecord);
+  }
+
   verifyAccessToken(token: string): TokenPayload | null {
     try {
       return jwt.verify(token, process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key") as TokenPayload;
@@ -89,6 +162,60 @@ export class AuthService {
 
   generateIdempotencyKey(): string {
     return crypto.randomUUID();
+  }
+
+  private buildAdminAuthResponse(authRecord: AdminAuthRecord) {
+    return {
+      tokens: this.issueAdminTokens(authRecord.user, authRecord.tenant),
+      user: {
+        id: authRecord.user.id,
+        tenant_id: authRecord.user.tenant_id,
+        username: authRecord.user.username ?? authRecord.tenant.name,
+        mobile_number: authRecord.user.mobile_number ?? authRecord.tenant.mobile_number ?? "",
+        role: authRecord.user.role,
+      },
+      tenant: {
+        id: authRecord.tenant.id,
+        code: authRecord.tenant.code,
+        distributor_name: authRecord.tenant.name,
+        owner_name: authRecord.tenant.owner_name ?? "",
+        mobile_number: authRecord.tenant.mobile_number ?? "",
+        gst_number: authRecord.tenant.gst_number ?? "",
+        full_address: authRecord.tenant.full_address ?? "",
+      },
+    };
+  }
+
+  private hashPassword(password: string): string {
+    const salt = crypto.randomBytes(16).toString("hex");
+    const derivedKey = crypto.scryptSync(password, salt, 64).toString("hex");
+    return `${salt}:${derivedKey}`;
+  }
+
+  private verifyPassword(password: string, passwordHash: string): boolean {
+    const [salt, storedHash] = passwordHash.split(":");
+    if (!salt || !storedHash) {
+      return false;
+    }
+
+    const derivedKey = crypto.scryptSync(password, salt, 64);
+    const storedBuffer = Buffer.from(storedHash, "hex");
+
+    if (derivedKey.length !== storedBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(derivedKey, storedBuffer);
+  }
+
+  private generateTenantCode(name: string): string {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 24);
+
+    return `${slug || "tenant"}-${Date.now().toString(36)}`;
   }
 
   private verifyRefreshToken(token: string): TokenPayload | null {
@@ -112,6 +239,33 @@ export class AuthService {
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key", {
       expiresIn: "7d" as any,
     });
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresInSeconds: 24 * 60 * 60,
+    };
+  }
+
+  private issueAdminTokens(user: AdminUserRecord, tenant: AdminTenantRecord) {
+    const payload: AdminTokenPayload = {
+      userId: String(user.id),
+      tenantId: String(tenant.id),
+      role: user.role,
+      mobileNumber: user.mobile_number ?? tenant.mobile_number ?? "",
+      tokenType: "admin",
+    };
+
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key", {
+      expiresIn: (process.env.JWT_EXPIRES_IN ?? "1d") as any,
+    });
+    const refreshToken = jwt.sign(
+      payload,
+      process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key",
+      {
+        expiresIn: "7d" as any,
+      },
+    );
 
     return {
       accessToken,
