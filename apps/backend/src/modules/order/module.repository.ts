@@ -1,237 +1,251 @@
+import crypto from "crypto";
 import type { Knex } from "knex";
 
 import { BaseRepository } from "../../shared/base-repository";
 import type { OrderStatus } from "./order-status";
 
-type TransactionOrDb = Knex | Knex.Transaction;
+type DbExecutor = Knex | Knex.Transaction;
 
-type OrderHeaderInsert = {
+export type OrderRecord = {
+  id: string;
   tenant_id: string;
   retailer_id: string;
+  retailer_name: string;
   order_number: string;
-  total_amount: number;
   status: OrderStatus;
-  idempotency_key: string;
-  metadata: Record<string, unknown>;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  items_count?: number;
 };
 
-type OrderLineInsert = {
+export type OrderItemRecord = {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_name: string;
+  brand_name: string | null;
+  quantity: number;
+  price: number;
+  total_price: number;
+};
+
+export type CreateOrderInput = {
+  retailer_id: string;
+  order_number: string;
+  status: OrderStatus;
+  total_amount: number;
+};
+
+export type CreateOrderItemInput = {
   product_id: string;
   quantity: number;
-  unit_price: number;
-  line_total: number;
-  product_name?: string;
-  pack_size?: string;
-};
-
-type OrderPaymentInsert = {
-  order_id: string;
-  payment_type: string;
-  amount: number;
-  payment_status: string;
+  price: number;
+  total_price: number;
 };
 
 export class OrderRepository extends BaseRepository {
-  async findExistingByIdempotencyKey(idempotencyKey: string, db: TransactionOrDb = this.db) {
-    return db("orders").where({ idempotency_key: idempotencyKey }).first();
+  async findRetailerById(tenantId: string, retailerId: string, db: DbExecutor = this.db) {
+    const retailer = await db("retailers")
+      .where({
+        id: retailerId,
+        tenant_id: tenantId,
+        is_active: true,
+      })
+      .first("id", "tenant_id", "name", "mobile_number");
+
+    return retailer ?? null;
   }
 
-  async getProductsForOrder(tenantId: string, productIds: string[], db: TransactionOrDb = this.db) {
+  async getProductsForTenant(tenantId: string, productIds: string[], db: DbExecutor = this.db) {
+    if (productIds.length === 0) {
+      return [];
+    }
+
     return db("tenant_products")
-      .where("tenant_id", tenantId)
-      .whereIn("id", productIds)
+      .leftJoin("global_brands", "tenant_products.brand_id", "global_brands.id")
+      .where("tenant_products.tenant_id", tenantId)
+      .where("tenant_products.status", "active")
+      .whereIn("tenant_products.id", productIds)
       .select(
-        "id",
-        "product_name",
-        "pack_size",
-        "base_price",
-        "advance_price",
-        "brand_id",
+        "tenant_products.id",
+        "tenant_products.product_name",
+        "tenant_products.base_price",
+        "global_brands.name as brand_name",
       );
   }
 
-  async createOrderHeader(payload: OrderHeaderInsert, db: TransactionOrDb) {
-    const [orderId] = await db("orders").insert({
-      ...payload,
-      created_at: this.db.fn.now(),
-      updated_at: this.db.fn.now(),
-    });
+  async getNextOrderSequence(_tenantId: string, db: DbExecutor = this.db) {
+    await db.raw("SELECT pg_advisory_xact_lock(?, ?)", [2026, 328]);
 
-    return String(orderId);
+    const row = await db("orders").count<{ count: string }>({ count: "*" }).first();
+    return Number(row?.count ?? 0) + 1;
   }
 
-  async createOrderLines(orderId: string, lineItems: OrderLineInsert[], db: TransactionOrDb) {
-    const lineIds = await db("order_line_items").insert(
-      lineItems.map((lineItem) => ({
-        order_id: orderId,
-        product_id: lineItem.product_id,
-        quantity: lineItem.quantity,
-        unit_price: lineItem.unit_price,
-        line_total: lineItem.line_total,
-        scheme_discount: 0,
-        created_at: this.db.fn.now(),
-        updated_at: this.db.fn.now(),
-      })),
-    );
-
-    return lineIds.map((value) => String(value));
-  }
-
-  async createPayment(payload: OrderPaymentInsert, tenantId: string, db: TransactionOrDb) {
-    await db("order_payments").insert({
-      order_id: payload.order_id,
-      tenant_id: tenantId,
-      payment_type: payload.payment_type,
-      amount: payload.amount,
-      payment_status: payload.payment_status,
-      created_at: this.db.fn.now(),
-      updated_at: this.db.fn.now(),
-    });
-  }
-
-  async createStockLocks(
-    orderId: string,
+  async createOrderWithItems(
     tenantId: string,
-    lineIds: string[],
-    lineItems: Array<{ product_id: string; quantity: number }>,
-    db: TransactionOrDb,
+    order: CreateOrderInput,
+    items: CreateOrderItemInput[],
+    db: DbExecutor,
   ) {
-    await db("order_stock_locks").insert(
-      lineItems.map((lineItem, index) => ({
-        order_id: orderId,
-        order_line_item_id: lineIds[index] ?? null,
-        tenant_id: tenantId,
-        product_id: lineItem.product_id,
-        locked_quantity: lineItem.quantity,
-        status: "active",
-        locked_at: this.db.fn.now(),
-        metadata: JSON.stringify({ source: "order_placement" }),
-        created_at: this.db.fn.now(),
-        updated_at: this.db.fn.now(),
+    const id = crypto.randomUUID();
+
+    await db("orders").insert({
+      id,
+      tenant_id: tenantId,
+      retailer_id: order.retailer_id,
+      order_number: order.order_number,
+      status: order.status,
+      total_amount: order.total_amount,
+      created_at: this.db.fn.now(),
+      updated_at: this.db.fn.now(),
+    });
+
+    await db("order_items").insert(
+      items.map((item) => ({
+        id: crypto.randomUUID(),
+        order_id: id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price: item.price,
+        total_price: item.total_price,
       })),
     );
+
+    return this.getOrderById(tenantId, id, db);
   }
 
-  async releaseStockLocks(orderId: string, db: TransactionOrDb) {
-    await db("order_stock_locks")
-      .where({ order_id: orderId, status: "active" })
-      .update({
-        status: "released",
-        released_at: this.db.fn.now(),
-        updated_at: this.db.fn.now(),
-      });
+  async listOrders(tenantId: string, db: DbExecutor = this.db): Promise<OrderRecord[]> {
+    const rows = await db("orders")
+      .leftJoin("retailers", "orders.retailer_id", "retailers.id")
+      .leftJoin("order_items", "orders.id", "order_items.order_id")
+      .where("orders.tenant_id", tenantId)
+      .groupBy(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+      )
+      .orderBy("orders.created_at", "desc")
+      .select(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name as retailer_name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+        this.db.raw("COUNT(order_items.id) as items_count"),
+      );
+
+    return rows.map((row) => this.mapOrder(row));
   }
 
-  async markRetailerLinkOrder(tenantId: string, retailerId: string, orderTotal: number, db: TransactionOrDb) {
-    const existingLink = await db("retailer_distributor_links")
-      .where({ tenant_id: tenantId, retailer_id: retailerId })
-      .first("id", "total_orders", "total_order_value");
+  async getOrderById(tenantId: string, orderId: string, db: DbExecutor = this.db) {
+    const orderRow = await db("orders")
+      .leftJoin("retailers", "orders.retailer_id", "retailers.id")
+      .leftJoin("order_items", "orders.id", "order_items.order_id")
+      .where("orders.id", orderId)
+      .andWhere("orders.tenant_id", tenantId)
+      .groupBy(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+      )
+      .first(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name as retailer_name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+        this.db.raw("COUNT(order_items.id) as items_count"),
+      );
 
-    if (!existingLink) {
-      return;
-    }
-
-    await db("retailer_distributor_links")
-      .where({ id: existingLink.id })
-      .update({
-        total_orders: Number(existingLink.total_orders ?? 0) + 1,
-        total_order_value: Number(existingLink.total_order_value ?? 0) + orderTotal,
-        last_ordered_at: this.db.fn.now(),
-        updated_at: this.db.fn.now(),
-      });
-  }
-
-  async getRetailerOrders(retailerId: string, tenantId: string, limit: number) {
-    return this.db("orders")
-      .where({ retailer_id: retailerId, tenant_id: tenantId })
-      .orderBy("created_at", "desc")
-      .limit(limit)
-      .select("id", "status", "total_amount", "created_at", "order_number");
-  }
-
-  async getOrderById(orderId: string, retailerId?: string) {
-    const orderQuery = this.db("orders").where({ id: orderId });
-    if (retailerId) {
-      orderQuery.andWhere({ retailer_id: retailerId });
-    }
-
-    const order = await orderQuery.first();
-    if (!order) {
+    if (!orderRow) {
       return null;
     }
 
-    const items = await this.db("order_line_items")
-      .join("tenant_products", "order_line_items.product_id", "tenant_products.id")
+    const itemRows = await db("order_items")
+      .join("tenant_products", "order_items.product_id", "tenant_products.id")
       .leftJoin("global_brands", "tenant_products.brand_id", "global_brands.id")
-      .where("order_line_items.order_id", orderId)
+      .where("order_items.order_id", orderId)
       .select(
-        "order_line_items.id as line_item_id",
-        "order_line_items.quantity",
-        "order_line_items.unit_price",
-        "order_line_items.line_total",
-        "tenant_products.id",
-        "tenant_products.product_name as name",
-        "tenant_products.pack_size",
-        "tenant_products.base_price",
-        "tenant_products.advance_price",
-        "tenant_products.brand_id",
+        "order_items.id",
+        "order_items.order_id",
+        "order_items.product_id",
+        "tenant_products.product_name",
         "global_brands.name as brand_name",
+        "order_items.quantity",
+        "order_items.price",
+        "order_items.total_price",
       );
 
-    const payment = await this.db("order_payments").where({ order_id: orderId }).first();
-    const stockLocks = await this.db("order_stock_locks")
-      .where({ order_id: orderId })
-      .select("product_id", "locked_quantity", "status");
-
     return {
-      order: this.mapOrder(order),
-      items: items.map((item) => this.mapOrderItem(item)),
-      payment,
-      stockLocks,
+      ...this.mapOrder(orderRow),
+      items: itemRows.map((row) => this.mapOrderItem(row)),
     };
   }
 
-  async updateStatus(orderId: string, status: OrderStatus, db: TransactionOrDb = this.db) {
-    await db("orders")
-      .where({ id: orderId })
+  async updateStatus(tenantId: string, orderId: string, status: OrderStatus, db: DbExecutor = this.db) {
+    const updatedCount = await db("orders")
+      .where({
+        id: orderId,
+        tenant_id: tenantId,
+      })
       .update({
         status,
         updated_at: this.db.fn.now(),
-        ...(status === "confirmed" ? { invoice_confirmed_at: this.db.fn.now() } : {}),
-        ...(status === "dispatched" ? { dispatched_at: this.db.fn.now() } : {}),
-        ...(status === "delivered" ? { delivered_at: this.db.fn.now() } : {}),
-        ...(status === "closed" || status === "cancelled" ? { closed_at: this.db.fn.now() } : {}),
       });
+
+    if (!updatedCount) {
+      return null;
+    }
+
+    return this.getOrderById(tenantId, orderId, db);
   }
 
-  private mapOrder(row: any) {
+  private mapOrder(row: any): OrderRecord {
     return {
       id: String(row.id),
-      retailer_id: String(row.retailer_id),
       tenant_id: String(row.tenant_id),
+      retailer_id: String(row.retailer_id),
+      retailer_name: row.retailer_name ?? "Unknown retailer",
       order_number: row.order_number,
       status: row.status,
       total_amount: Number(row.total_amount ?? 0),
-      created_at: row.created_at,
-      updated_at: row.updated_at,
+      created_at: new Date(row.created_at).toISOString(),
+      updated_at: new Date(row.updated_at).toISOString(),
+      items_count: row.items_count === undefined ? undefined : Number(row.items_count ?? 0),
     };
   }
 
-  private mapOrderItem(row: any) {
+  private mapOrderItem(row: any): OrderItemRecord {
     return {
-      line_item_id: String(row.line_item_id),
-      quantity: Number(row.quantity),
-      unit_price: Number(row.unit_price),
-      line_total: Number(row.line_total),
-      product: {
-        id: String(row.id),
-        brand_id: row.brand_id ? String(row.brand_id) : null,
-        brand_name: row.brand_name ?? "Unknown",
-        name: row.name,
-        pack_size: row.pack_size,
-        base_price: Number(row.base_price),
-        advance_price: Number(row.advance_price ?? row.base_price),
-      },
+      id: String(row.id),
+      order_id: String(row.order_id),
+      product_id: String(row.product_id),
+      product_name: row.product_name,
+      brand_name: row.brand_name ?? null,
+      quantity: Number(row.quantity ?? 0),
+      price: Number(row.price ?? 0),
+      total_price: Number(row.total_price ?? 0),
     };
   }
 }

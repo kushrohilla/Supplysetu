@@ -9,23 +9,19 @@ export type OrderTransition = {
 };
 
 const transitionMap: Record<OrderStatus, readonly OrderStatus[]> = {
-  pending_approval: ["approved_for_export", "cancelled"],
-  approved_for_export: ["invoiced", "cancelled"],
-  invoiced: ["dispatched"],
-  dispatched: ["delivered"],
-  delivered: ["closed"],
-  closed: [],
-  cancelled: []
+  DRAFT: ["PLACED", "CONFIRMED", "CANCELLED"],
+  PLACED: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["CANCELLED"],
+  CANCELLED: []
 };
 
 const transitionActorMap: Record<string, readonly OrderActorRole[]> = {
-  "pending_approval:approved_for_export": ["admin", "system"],
-  "pending_approval:cancelled": ["admin", "system"],
-  "approved_for_export:invoiced": ["system", "sync_worker"],
-  "approved_for_export:cancelled": ["admin", "system"],
-  "invoiced:dispatched": ["admin", "system"],
-  "dispatched:delivered": ["admin", "system"],
-  "delivered:closed": ["system", "sync_worker"]
+  "DRAFT:PLACED": ["admin", "system"],
+  "DRAFT:CONFIRMED": ["admin", "system"],
+  "DRAFT:CANCELLED": ["admin", "system"],
+  "PLACED:CONFIRMED": ["admin", "system"],
+  "PLACED:CANCELLED": ["admin", "system"],
+  "CONFIRMED:CANCELLED": ["admin", "system"]
 };
 
 const transitionKey = (transition: OrderTransition) => `${transition.from}:${transition.to}`;
@@ -35,7 +31,7 @@ export const getAllowedNextStatuses = (status: OrderStatus): readonly OrderStatu
 };
 
 export const canTransitionOrderStatus = (from: OrderStatus, to: OrderStatus): boolean => {
-  return transitionMap[from].includes(to);
+  return transitionMap[from]?.includes(to) ?? false;
 };
 
 export const getAllowedActorRolesForTransition = (
@@ -98,11 +94,9 @@ export const assertNoDuplicateTerminalUpdate = (currentStatus: OrderStatus, next
   }
 
   const duplicateErrorMap: Partial<Record<OrderStatus, string>> = {
-    invoiced: "DUPLICATE_INVOICE_CONFIRMATION",
-    dispatched: "DUPLICATE_DISPATCH_CONFIRMATION",
-    delivered: "DUPLICATE_DELIVERY_CONFIRMATION",
-    closed: "DUPLICATE_ORDER_CLOSURE",
-    cancelled: "DUPLICATE_ORDER_CANCELLATION"
+    PLACED: "DUPLICATE_ORDER_PLACEMENT",
+    CONFIRMED: "DUPLICATE_ORDER_CONFIRMATION",
+    CANCELLED: "DUPLICATE_ORDER_CANCELLATION"
   };
 
   throw new AppError(
