@@ -1,5 +1,6 @@
 import { getStoredSession } from "@/services/auth.service";
 import { apiService } from "@/services/api.service";
+import { env } from "@/services/env";
 import type {
   Brand,
   CreateBrandPayload,
@@ -140,7 +141,7 @@ class CatalogueService {
     formData.append("brandId", brandId);
     files.forEach((file) => formData.append("files", file));
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1"}/catalogue/product-images`, {
+    const response = await fetch(`${env.apiBaseUrl}/catalogue/product-images`, {
       method: "POST",
       body: formData,
       headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,

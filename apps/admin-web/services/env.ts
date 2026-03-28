@@ -1,5 +1,11 @@
-const FALLBACK_API_BASE_URL = "http://localhost:5000/api/v1";
+const normalizeApiUrl = (value: string) => value.replace(/\/+$/, "");
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+if (!apiUrl) {
+  throw new Error("Missing NEXT_PUBLIC_API_URL environment variable.");
+}
 
 export const env = {
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? FALLBACK_API_BASE_URL
+  apiBaseUrl: normalizeApiUrl(apiUrl),
 };

@@ -388,11 +388,8 @@ export async function down(knex: Knex): Promise<void> {
 
 | Document | Purpose |
 |----------|---------|
-| [DATABASE_EVOLUTION.md](../DATABASE_EVOLUTION.md) | Complete design strategy & philosophy |
-| [MIGRATION_REFACTORING_GUIDE.md](../MIGRATION_REFACTORING_GUIDE.md) | Migration execution plan & data migration |
-| [MIGRATION_STRATEGY_SUMMARY.md](../MIGRATION_STRATEGY_SUMMARY.md) | Quick reference & examples |
-| [MIGRATION_IMPLEMENTATION_CHECKLIST.md](../MIGRATION_IMPLEMENTATION_CHECKLIST.md) | Step-by-step execution guide |
-| This file | Migration directory reference |
+| This file | Migration sequence, troubleshooting, and operating notes |
+| [README.md](../../../README.md) | Backend startup, environment setup, and deployment entry point |
 
 ---
 
@@ -447,7 +444,7 @@ npm run migrate:latest --env staging
 
 ## Support
 
-- **Questions about migrations?** → See [DATABASE_EVOLUTION.md](../DATABASE_EVOLUTION.md)
-- **Need to execute?** → See [MIGRATION_IMPLEMENTATION_CHECKLIST.md](../MIGRATION_IMPLEMENTATION_CHECKLIST.md)
+- **Questions about migrations?** → Review the migration sequence and troubleshooting sections in this file
+- **Need to execute?** → Follow the backend startup and environment guidance in [README.md](../../../README.md)
 - **Issues?** → Check troubleshooting section above or contact database admin
 

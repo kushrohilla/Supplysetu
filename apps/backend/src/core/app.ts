@@ -25,7 +25,7 @@ export const buildApp = async (db: Knex) => {
   });
 
   await app.register(cors, {
-    origin: env.CORS_ORIGINS.split(","),
+    origin: true,
     credentials: true,
   });
   await app.register(helmet);
