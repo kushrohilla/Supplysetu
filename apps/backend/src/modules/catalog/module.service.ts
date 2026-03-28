@@ -1,5 +1,7 @@
 import type { CatalogRepository } from "./module.repository";
 
+const DEFAULT_BRAND_NAME = "General";
+
 export class CatalogService {
   constructor(private readonly catalogRepository: CatalogRepository) {}
 
@@ -72,8 +74,8 @@ export class CatalogService {
     return this.catalogRepository.getLatestStockMap(tenantId, productIds);
   }
 
-  async createBrand(name: string) {
-    const existing = await this.catalogRepository.findBrandByName(name);
+  async createBrand(name: string, tenantId?: string) {
+    const existing = await this.catalogRepository.findBrandByName(name, tenantId);
     if (existing) {
       return {
         id: String(existing.id),
@@ -97,7 +99,7 @@ export class CatalogService {
   async createProducts(
     tenantId: string,
     products: Array<{
-      brandId: string;
+      brandId?: string;
       productName: string;
       variantPackSize: string;
       baseSellingPrice: number;
@@ -106,7 +108,15 @@ export class CatalogService {
       isActive: boolean;
     }>,
   ) {
-    const created = await this.catalogRepository.createTenantProducts(tenantId, products);
+    const defaultBrand =
+      products.some((product) => !product.brandId) ? await this.getOrCreateDefaultBrandForTenant(tenantId) : null;
+
+    const normalizedProducts = products.map((product) => ({
+      ...product,
+      brandId: product.brandId ?? String(defaultBrand?.id),
+    }));
+
+    const created = await this.catalogRepository.createTenantProducts(tenantId, normalizedProducts);
     return created.map((product) => ({
       id: String(product.id),
       brandId: String(product.brand_id),
@@ -114,10 +124,22 @@ export class CatalogService {
       variantPackSize: product.pack_size,
       baseSellingPrice: Number(product.base_price),
       mrp: Number(product.base_price),
-      openingStock: products.find((row) => row.productName === product.name && row.variantPackSize === product.pack_size)?.openingStock ?? 0,
+      openingStock:
+        normalizedProducts.find(
+          (row) => row.productName === product.name && row.variantPackSize === product.pack_size,
+        )?.openingStock ?? 0,
       isActive: true,
       imageUrl: null,
       createdAt: new Date().toISOString(),
     }));
+  }
+
+  private async getOrCreateDefaultBrandForTenant(tenantId: string) {
+    const existing = await this.catalogRepository.findDefaultBrandForTenant(tenantId);
+    if (existing) {
+      return existing;
+    }
+
+    return this.catalogRepository.createDefaultBrandForTenant(tenantId, DEFAULT_BRAND_NAME);
   }
 }

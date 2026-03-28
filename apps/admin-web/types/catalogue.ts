@@ -23,22 +23,11 @@ export type CreateBrandPayload = {
 };
 
 export type CreateProductPayload = {
-  brandId: string;
+  brandId?: string;
   productName: string;
   variantPackSize: string;
   baseSellingPrice: number;
   mrp: number;
   openingStock: number;
   isActive: boolean;
-};
-
-export type ParsedProductSuggestion = {
-  id: string;
-  productName: string;
-  variantPackSize: string;
-  baseSellingPrice: number;
-  mrp: number;
-  openingStock: number;
-  isActive: boolean;
-  status: "PENDING" | "ACCEPTED" | "REJECTED";
 };

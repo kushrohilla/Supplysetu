@@ -1,5 +1,5 @@
-import { DeliveryExecutionScreen } from "@/modules/delivery/DeliveryExecutionScreen";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function DeliveryPage() {
-  return <DeliveryExecutionScreen />;
+  return <ModuleUnavailableState title="Delivery not available yet" />;
 }

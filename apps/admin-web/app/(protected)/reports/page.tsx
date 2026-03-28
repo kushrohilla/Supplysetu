@@ -1,5 +1,5 @@
-import { ReportsDashboard } from "@/modules/reports/ReportsDashboard";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function ReportsPage() {
-  return <ReportsDashboard />;
+  return <ModuleUnavailableState title="Reports not available yet" />;
 }

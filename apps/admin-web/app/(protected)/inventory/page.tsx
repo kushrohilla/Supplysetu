@@ -1,5 +1,5 @@
-import { InventoryDashboard } from "@/modules/inventory/InventoryDashboard";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function InventoryPage() {
-  return <InventoryDashboard />;
+  return <ModuleUnavailableState title="Inventory not available yet" />;
 }

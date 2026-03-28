@@ -25,7 +25,7 @@ export const createBrandSchema = z.object({
 export const createProductsSchema = z.object({
   tenant_id: z.string().min(1),
   products: z.array(z.object({
-    brandId: z.string().min(1),
+    brandId: z.string().min(1).optional(),
     productName: z.string().trim().min(1),
     variantPackSize: z.string().trim().min(1),
     baseSellingPrice: z.coerce.number().nonnegative(),

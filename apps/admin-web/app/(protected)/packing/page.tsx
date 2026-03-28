@@ -1,5 +1,5 @@
-import { PackingBoardScreen } from "@/modules/packing/PackingBoardScreen";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function PackingPage() {
-  return <PackingBoardScreen />;
+  return <ModuleUnavailableState title="Packing not available yet" />;
 }

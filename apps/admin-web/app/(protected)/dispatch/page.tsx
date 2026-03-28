@@ -1,5 +1,5 @@
-import { DispatchBatchCreatorScreen } from "@/modules/dispatch/DispatchBatchCreatorScreen";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function DispatchPage() {
-  return <DispatchBatchCreatorScreen />;
+  return <ModuleUnavailableState title="Dispatch not available yet" />;
 }

@@ -4,9 +4,14 @@ import type { Knex } from "knex";
 import { BaseRepository } from "../../shared/base-repository";
 
 export class CatalogRepository extends BaseRepository {
+  private getDefaultBrandSource(tenantId: string) {
+    return `tenant-default:${tenantId}`;
+  }
+
   async listBrands(tenantId: string) {
     const tenantIdBinding = this.db.raw("?", [tenantId]);
     const activeStatusBinding = this.db.raw("?", ["active"]);
+    const defaultBrandSource = this.getDefaultBrandSource(tenantId);
 
     return this.db("global_brands")
       .leftJoin("tenant_products", function joinTenantProducts() {
@@ -15,6 +20,11 @@ export class CatalogRepository extends BaseRepository {
           .andOn("tenant_products.status", "=", activeStatusBinding);
       })
       .where("global_brands.is_active", true)
+      .andWhere((queryBuilder) => {
+        queryBuilder
+          .whereRaw("global_brands.source NOT LIKE 'tenant-default:%'")
+          .orWhere("global_brands.source", defaultBrandSource);
+      })
       .groupBy("global_brands.id", "global_brands.name", "global_brands.updated_at")
       .select(
         "global_brands.id",
@@ -116,10 +126,21 @@ export class CatalogRepository extends BaseRepository {
     return stockMap;
   }
 
-  async findBrandByName(name: string) {
-    return this.db("global_brands")
-      .whereRaw("LOWER(name) = ?", [name.trim().toLowerCase()])
-      .first("id", "name", "updated_at");
+  async findBrandByName(name: string, tenantId?: string) {
+    const query = this.db("global_brands")
+      .whereRaw("LOWER(name) = ?", [name.trim().toLowerCase()]);
+
+    if (tenantId) {
+      query.andWhere((queryBuilder) => {
+        queryBuilder
+          .whereRaw("global_brands.source NOT LIKE 'tenant-default:%'")
+          .orWhere("global_brands.source", this.getDefaultBrandSource(tenantId));
+      });
+    } else {
+      query.andWhereRaw("global_brands.source NOT LIKE 'tenant-default:%'");
+    }
+
+    return query.first("id", "name", "updated_at");
   }
 
   async createBrand(name: string) {
@@ -136,6 +157,38 @@ export class CatalogRepository extends BaseRepository {
 
     return this.db("global_brands")
       .where({ id: brand.id })
+      .first("id", "name", "updated_at");
+  }
+
+  async findDefaultBrandForTenant(tenantId: string) {
+    return this.db("global_brands")
+      .where({
+        name: "General",
+        source: this.getDefaultBrandSource(tenantId),
+      })
+      .first("id", "name", "updated_at");
+  }
+
+  async createDefaultBrandForTenant(tenantId: string, name: string) {
+    const brand = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      source: this.getDefaultBrandSource(tenantId),
+      is_active: true,
+      created_at: this.db.fn.now(),
+      updated_at: this.db.fn.now(),
+    };
+
+    await this.db("global_brands")
+      .insert(brand)
+      .onConflict(["name", "source"])
+      .ignore();
+
+    return this.db("global_brands")
+      .where({
+        name: brand.name,
+        source: brand.source,
+      })
       .first("id", "name", "updated_at");
   }
 

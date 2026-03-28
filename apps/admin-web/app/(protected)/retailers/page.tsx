@@ -1,5 +1,5 @@
-import { RetailerInviteGenerator } from "@/modules/retailers/RetailerInviteGenerator";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function RetailersPage() {
-  return <RetailerInviteGenerator />;
+  return <ModuleUnavailableState title="Retailers not available yet" />;
 }

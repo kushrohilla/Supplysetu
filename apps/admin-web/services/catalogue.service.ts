@@ -1,11 +1,9 @@
 import { getStoredSession } from "@/services/auth.service";
 import { apiService } from "@/services/api.service";
-import { env } from "@/services/env";
 import type {
   Brand,
   CreateBrandPayload,
   CreateProductPayload,
-  ParsedProductSuggestion,
   Product,
 } from "@/types/catalogue";
 
@@ -82,12 +80,23 @@ class CatalogueService {
   }
 
   async createBrand(payload: CreateBrandPayload): Promise<Brand> {
-    const brand = await apiService.request<CatalogBrandResponse>("/catalogue/brands", {
-      method: "POST",
-      body: payload,
-    });
+    console.info("[catalogueService.createBrand] request", payload);
 
-    return mapBrand(brand);
+    try {
+      const brand = await apiService.request<CatalogBrandResponse>("/brands", {
+        method: "POST",
+        body: payload,
+      });
+
+      console.info("[catalogueService.createBrand] response", brand);
+      return mapBrand(brand);
+    } catch (error) {
+      console.error("[catalogueService.createBrand] failed", {
+        payload,
+        error,
+      });
+      throw error;
+    }
   }
 
   async fetchProductsByBrand(brandId: string): Promise<Product[]> {
@@ -115,76 +124,6 @@ class CatalogueService {
     });
 
     return products.map(mapProduct);
-  }
-
-  async bulkCreateProducts(brandId: string, rows: ParsedProductSuggestion[]): Promise<Product[]> {
-    const acceptedRows = rows.filter((row) => row.status === "ACCEPTED");
-    const payload = acceptedRows.map((row) => ({
-      brandId,
-      productName: row.productName,
-      variantPackSize: row.variantPackSize,
-      baseSellingPrice: row.baseSellingPrice,
-      mrp: row.mrp,
-      openingStock: row.openingStock,
-      isActive: row.isActive,
-    }));
-    return this.createProducts(payload);
-  }
-
-  async uploadProductImages(brandId: string, files: File[]): Promise<void> {
-    if (files.length === 0) {
-      return;
-    }
-
-    const authToken = getStoredSession()?.accessToken;
-    const formData = new FormData();
-    formData.append("brandId", brandId);
-    files.forEach((file) => formData.append("files", file));
-
-    const response = await fetch(`${env.apiBaseUrl}/catalogue/product-images`, {
-      method: "POST",
-      body: formData,
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
-    });
-
-    if (!response.ok) {
-      throw new Error("Image upload failed.");
-    }
-  }
-
-  simulateParseCataloguePdf(fileName: string): ParsedProductSuggestion[] {
-    return [
-      {
-        id: `SG-${Date.now()}-1`,
-        productName: `${fileName.split(".")[0]} Refined Oil`,
-        variantPackSize: "1L",
-        baseSellingPrice: 130,
-        mrp: 145,
-        openingStock: 100,
-        isActive: true,
-        status: "PENDING",
-      },
-      {
-        id: `SG-${Date.now()}-2`,
-        productName: `${fileName.split(".")[0]} Chana Dal`,
-        variantPackSize: "1kg",
-        baseSellingPrice: 86,
-        mrp: 98,
-        openingStock: 70,
-        isActive: true,
-        status: "PENDING",
-      },
-      {
-        id: `SG-${Date.now()}-3`,
-        productName: `${fileName.split(".")[0]} Tea Dust`,
-        variantPackSize: "500g",
-        baseSellingPrice: 210,
-        mrp: 235,
-        openingStock: 35,
-        isActive: true,
-        status: "PENDING",
-      },
-    ];
   }
 }
 

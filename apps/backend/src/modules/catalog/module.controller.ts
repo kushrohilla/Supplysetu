@@ -53,7 +53,7 @@ export class CatalogController {
 
   async createBrand(request: FastifyRequest, reply: FastifyReply) {
     const payload = createBrandSchema.parse(request.body);
-    const brand = await request.server.container.catalogService.createBrand(payload.name);
+    const brand = await request.server.container.catalogService.createBrand(payload.name, request.auth?.tenantId);
     return reply.status(HTTP_STATUS.CREATED).send({ success: true, data: brand });
   }
 

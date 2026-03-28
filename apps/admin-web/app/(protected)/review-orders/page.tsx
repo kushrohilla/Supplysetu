@@ -1,5 +1,5 @@
-import { OrderReviewQueueScreen } from "@/modules/order-review/OrderReviewQueueScreen";
+import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
 
 export default function ReviewOrdersPage() {
-  return <OrderReviewQueueScreen />;
+  return <ModuleUnavailableState title="Orders not available yet" />;
 }
