@@ -24,12 +24,12 @@ const createRetailersTable = async (knex: Knex) => {
 export async function up(knex: Knex): Promise<void> {
   const hasRetailerDistributorLinks = await knex.schema.hasTable("retailer_distributor_links");
   if (hasRetailerDistributorLinks) {
-    await knex.schema.dropTable("retailer_distributor_links");
+    await knex.raw('DROP TABLE IF EXISTS "retailer_distributor_links" CASCADE');
   }
 
   const hasRetailers = await knex.schema.hasTable("retailers");
   if (hasRetailers) {
-    await knex.schema.dropTable("retailers");
+    await knex.raw('DROP TABLE IF EXISTS "retailers" CASCADE');
   }
 
   await createRetailersTable(knex);
@@ -38,6 +38,6 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
   const hasRetailers = await knex.schema.hasTable("retailers");
   if (hasRetailers) {
-    await knex.schema.dropTable("retailers");
+    await knex.raw('DROP TABLE IF EXISTS "retailers" CASCADE');
   }
 }
