@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { Knex } from "knex";
 
 import { BaseRepository } from "../../shared/base-repository";
@@ -6,11 +7,14 @@ export interface RetailerRecord {
   id: string;
   phone: string;
   name: string;
+  address_line1?: string | null;
+  gst_number?: string | null;
   locality?: string | null;
   city?: string | null;
   state?: string | null;
+  pincode?: string | null;
   owner_name?: string | null;
-  credit_line_status: string;
+  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -48,17 +52,58 @@ export interface AdminAuthRecord {
 
 export class RetailerRepository extends BaseRepository {
   async findByPhone(phone: string): Promise<RetailerRecord | null> {
-    const retailer = await this.db("retailers").where({ phone }).first();
+    const retailer = await this.db("retailers")
+      .where({ phone })
+      .first(
+        "id",
+        "phone",
+        "name",
+        "address_line1",
+        "gst_number",
+        "locality",
+        "city",
+        "state",
+        "pincode",
+        "owner_name",
+        "is_active",
+        "created_at",
+        "updated_at",
+      );
     return retailer ?? null;
   }
 
   async findById(id: string): Promise<RetailerRecord | null> {
-    const retailer = await this.db("retailers").where({ id }).first();
+    const retailer = await this.db("retailers")
+      .where({ id })
+      .first(
+        "id",
+        "phone",
+        "name",
+        "address_line1",
+        "gst_number",
+        "locality",
+        "city",
+        "state",
+        "pincode",
+        "owner_name",
+        "is_active",
+        "created_at",
+        "updated_at",
+      );
     return retailer ?? null;
   }
 
-  async create(input: Pick<RetailerRecord, "phone" | "name" | "credit_line_status">): Promise<RetailerRecord> {
-    const [id] = await this.db("retailers").insert(input);
+  async create(input: Pick<RetailerRecord, "phone" | "name">): Promise<RetailerRecord> {
+    const id = crypto.randomUUID();
+    await this.db("retailers").insert({
+      id,
+      phone: input.phone.trim(),
+      name: input.name.trim(),
+      is_active: true,
+      created_at: this.db.fn.now(),
+      updated_at: this.db.fn.now(),
+    });
+
     return this.findById(String(id)) as Promise<RetailerRecord>;
   }
 

@@ -7,6 +7,7 @@ import {
   refreshTokenSchema,
   registerDistributorSchema,
   requestOtpSchema,
+  selectDistributorSchema,
   updateProfileSchema,
   verifyOtpSchema,
 } from "./module.schema";
@@ -114,6 +115,28 @@ export class AuthController {
 
     const distributors = await request.server.container.distributorService.listDistributors(retailerId);
     return reply.send({ success: true, data: distributors });
+  }
+
+  async selectDistributor(request: FastifyRequest, reply: FastifyReply) {
+    const retailerId = request.auth?.retailerId;
+    if (!retailerId) {
+      throw new AppError(HTTP_STATUS.UNAUTHORIZED, "UNAUTHORIZED", "Unauthorized");
+    }
+
+    const payload = selectDistributorSchema.parse(request.body);
+    const result = await request.server.container.authService.selectDistributor(retailerId, payload.distributor_id);
+
+    return reply.send({
+      success: true,
+      data: {
+        access_token: result.accessToken,
+        refresh_token: result.refreshToken,
+        expires_in: result.expiresInSeconds,
+        token_type: "Bearer",
+        tenant_id: result.tenantId,
+        retailer_id: result.retailerId,
+      },
+    });
   }
 
   async updateProfile(request: FastifyRequest, reply: FastifyReply) {

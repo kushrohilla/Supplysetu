@@ -12,6 +12,7 @@ const createContainer = () =>
     },
     catalogService: {
       createBrand: vi.fn(),
+      getBrands: vi.fn(),
     },
   }) as unknown as AppContainer;
 
@@ -111,6 +112,51 @@ describe("catalog brand routes", () => {
     expect(response.json()).toMatchObject({
       success: false,
       error_code: "VALIDATION_ERROR",
+    });
+
+    await app.close();
+  });
+
+  it("allows retailer-scoped brand listing without a tenant_id query parameter", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const catalogService = container.catalogService as unknown as { getBrands: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-1",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+    catalogService.getBrands.mockResolvedValue([
+      {
+        id: "brand-1",
+        name: "Amul",
+      },
+    ]);
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerCatalogRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/catalogue/brands",
+      headers: {
+        authorization: "Bearer retailer-token",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(catalogService.getBrands).toHaveBeenCalledWith("tenant-1");
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: [
+        {
+          id: "brand-1",
+          name: "Amul",
+        },
+      ],
     });
 
     await app.close();

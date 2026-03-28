@@ -12,5 +12,6 @@ export const registerAuthRoutes = async (fastify: FastifyInstance) => {
   fastify.post("/auth/verify", controller.verifyOtp.bind(controller));
   fastify.post("/auth/refresh", controller.refreshToken.bind(controller));
   fastify.get("/auth/distributors", { preHandler: authenticate }, controller.getDistributors.bind(controller));
+  fastify.post("/auth/select-distributor", { preHandler: authenticate }, controller.selectDistributor.bind(controller));
   fastify.post("/auth/profile", { preHandler: authenticate }, controller.updateProfile.bind(controller));
 };

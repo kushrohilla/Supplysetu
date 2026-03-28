@@ -3,6 +3,8 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import type { Knex } from "knex";
 
+import { HTTP_STATUS } from "../../shared/constants/http-status";
+import { AppError } from "../../shared/errors/app-error";
 import type { DistributorRepository } from "../distributor/module.repository";
 import type {
   AdminAuthRecord,
@@ -12,10 +14,12 @@ import type {
   RetailerRepository,
 } from "./module.repository";
 
-type TokenPayload = {
+type RetailerTokenPayload = {
   retailerId: string;
   phone: string;
-  tenantIds: string[];
+  tenantId?: string;
+  tenantIds?: string[];
+  tokenType: "retailer";
 };
 
 type AdminTokenPayload = {
@@ -63,16 +67,34 @@ export class AuthService {
       retailer = await this.retailerRepository.create({
         phone,
         name: `Retailer ${phone.slice(-4)}`,
-        credit_line_status: "none",
       });
     }
 
     const tenantIds = await this.distributorRepository.ensureRetailerTenantLinks(retailer.id);
 
     return {
-      tokens: this.issueTokens(retailer, tenantIds),
+      tokens: this.issueRetailerTokens(retailer, { tenantIds }),
       retailer,
       tenantIds,
+    };
+  }
+
+  async selectDistributor(retailerId: string, tenantId: string) {
+    const link = await this.distributorRepository.assertRetailerTenantLink(retailerId, tenantId);
+    if (!link) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "DISTRIBUTOR_NOT_FOUND", "Distributor not found");
+    }
+
+    const retailer = await this.retailerRepository.findById(retailerId);
+    if (!retailer) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "RETAILER_NOT_FOUND", "Retailer not found");
+    }
+
+    const tokens = this.issueRetailerTokens(retailer, { tenantId });
+    return {
+      ...tokens,
+      tenantId,
+      retailerId,
     };
   }
 
@@ -82,13 +104,26 @@ export class AuthService {
       return null;
     }
 
+    if (!("retailerId" in decoded) || typeof decoded.retailerId !== "string") {
+      return null;
+    }
+
     const retailer = await this.retailerRepository.findById(decoded.retailerId);
     if (!retailer) {
       return null;
     }
 
+    if ("tenantId" in decoded && typeof decoded.tenantId === "string") {
+      const link = await this.distributorRepository.assertRetailerTenantLink(retailer.id, decoded.tenantId);
+      if (!link) {
+        return null;
+      }
+
+      return this.issueRetailerTokens(retailer, { tenantId: decoded.tenantId });
+    }
+
     const tenantIds = await this.distributorRepository.getTenantIdsForRetailer(retailer.id);
-    return this.issueTokens(retailer, tenantIds);
+    return this.issueRetailerTokens(retailer, { tenantIds });
   }
 
   async updateRetailerProfile(retailerId: string, input: Partial<RetailerRecord>) {
@@ -152,9 +187,12 @@ export class AuthService {
     return this.buildAdminAuthResponse(authRecord);
   }
 
-  verifyAccessToken(token: string): TokenPayload | null {
+  verifyAccessToken(token: string): RetailerTokenPayload | AdminTokenPayload | null {
     try {
-      return jwt.verify(token, process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key") as TokenPayload;
+      return jwt.verify(
+        token,
+        process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key",
+      ) as RetailerTokenPayload | AdminTokenPayload;
     } catch {
       return null;
     }
@@ -218,19 +256,27 @@ export class AuthService {
     return `${slug || "tenant"}-${Date.now().toString(36)}`;
   }
 
-  private verifyRefreshToken(token: string): TokenPayload | null {
+  private verifyRefreshToken(token: string): RetailerTokenPayload | AdminTokenPayload | null {
     try {
-      return jwt.verify(token, process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key") as TokenPayload;
+      return jwt.verify(
+        token,
+        process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key",
+      ) as RetailerTokenPayload | AdminTokenPayload;
     } catch {
       return null;
     }
   }
 
-  private issueTokens(retailer: RetailerRecord, tenantIds: string[]) {
-    const payload: TokenPayload = {
+  private issueRetailerTokens(
+    retailer: RetailerRecord,
+    selection: { tenantId?: string; tenantIds?: string[] },
+  ) {
+    const payload: RetailerTokenPayload = {
       retailerId: String(retailer.id),
       phone: retailer.phone,
-      tenantIds: tenantIds.map(String),
+      tokenType: "retailer",
+      tenantId: selection.tenantId ? String(selection.tenantId) : undefined,
+      tenantIds: selection.tenantIds?.map(String),
     };
 
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET ?? "replace-with-a-strong-secret-key", {

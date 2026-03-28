@@ -15,6 +15,10 @@ type CreateOrderPayload = {
   items: CreateOrderItemPayload[];
 };
 
+type CreateRetailerOrderPayload = {
+  items: CreateOrderItemPayload[];
+};
+
 export class OrderService {
   constructor(
     private readonly db: Knex,
@@ -22,10 +26,66 @@ export class OrderService {
   ) {}
 
   async createOrder(tenantId: string, payload: CreateOrderPayload) {
-    const normalizedItems = this.normalizeItems(payload.items);
+    return this.createTenantOrder(tenantId, payload.retailer_id, payload.items);
+  }
+
+  async createRetailerOrder(tenantId: string, retailerId: string, payload: CreateRetailerOrderPayload) {
+    return this.createTenantOrder(tenantId, retailerId, payload.items);
+  }
+
+  async listOrders(tenantId: string) {
+    return this.orderRepository.listOrders(tenantId);
+  }
+
+  async listRetailerOrders(tenantId: string, retailerId: string) {
+    return this.orderRepository.listRetailerOrders(tenantId, retailerId);
+  }
+
+  async getOrder(tenantId: string, orderId: string) {
+    const order = await this.orderRepository.getOrderById(tenantId, orderId);
+    if (!order) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
+    }
+
+    return order;
+  }
+
+  async getRetailerOrder(tenantId: string, retailerId: string, orderId: string) {
+    const order = await this.orderRepository.getRetailerOrderById(tenantId, retailerId, orderId);
+    if (!order) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
+    }
+
+    return order;
+  }
+
+  async updateStatus(tenantId: string, orderId: string, nextStatus: OrderStatus) {
+    const order = await this.orderRepository.getOrderById(tenantId, orderId);
+    if (!order) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
+    }
+
+    if (!canTransitionOrderStatus(order.status, nextStatus)) {
+      throw new AppError(
+        HTTP_STATUS.CONFLICT,
+        "INVALID_ORDER_STATUS_TRANSITION",
+        `Cannot transition order from ${order.status} to ${nextStatus}`,
+      );
+    }
+
+    const updated = await this.orderRepository.updateStatus(tenantId, orderId, nextStatus);
+    if (!updated) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
+    }
+
+    return updated;
+  }
+
+  private async createTenantOrder(tenantId: string, retailerId: string, items: CreateOrderItemPayload[]) {
+    const normalizedItems = this.normalizeItems(items);
 
     return this.db.transaction(async (trx) => {
-      const retailer = await this.orderRepository.findRetailerById(tenantId, payload.retailer_id, trx);
+      const retailer = await this.orderRepository.findRetailerById(tenantId, retailerId, trx);
       if (!retailer) {
         throw new AppError(HTTP_STATUS.NOT_FOUND, "RETAILER_NOT_FOUND", "Retailer not found");
       }
@@ -62,7 +122,7 @@ export class OrderService {
       const created = await this.orderRepository.createOrderWithItems(
         tenantId,
         {
-          retailer_id: payload.retailer_id,
+          retailer_id: retailerId,
           order_number: orderNumber,
           status: ORDER_STATUS.PLACED,
           total_amount: totalAmount,
@@ -77,41 +137,6 @@ export class OrderService {
 
       return created;
     });
-  }
-
-  async listOrders(tenantId: string) {
-    return this.orderRepository.listOrders(tenantId);
-  }
-
-  async getOrder(tenantId: string, orderId: string) {
-    const order = await this.orderRepository.getOrderById(tenantId, orderId);
-    if (!order) {
-      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
-    }
-
-    return order;
-  }
-
-  async updateStatus(tenantId: string, orderId: string, nextStatus: OrderStatus) {
-    const order = await this.orderRepository.getOrderById(tenantId, orderId);
-    if (!order) {
-      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
-    }
-
-    if (!canTransitionOrderStatus(order.status, nextStatus)) {
-      throw new AppError(
-        HTTP_STATUS.CONFLICT,
-        "INVALID_ORDER_STATUS_TRANSITION",
-        `Cannot transition order from ${order.status} to ${nextStatus}`,
-      );
-    }
-
-    const updated = await this.orderRepository.updateStatus(tenantId, orderId, nextStatus);
-    if (!updated) {
-      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
-    }
-
-    return updated;
   }
 
   private normalizeItems(items: CreateOrderItemPayload[]) {

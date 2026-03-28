@@ -1,13 +1,17 @@
 import { z } from "zod";
 
-export const createOrderSchema = z.object({
+const orderItemSchema = z.object({
+  product_id: z.string().min(1),
+  quantity: z.coerce.number().int().positive(),
+}).strict();
+
+export const createAdminOrderSchema = z.object({
   retailer_id: z.string().min(1),
-  items: z.array(
-    z.object({
-      product_id: z.string().min(1),
-      quantity: z.coerce.number().int().positive(),
-    }).strict(),
-  ).min(1),
+  items: z.array(orderItemSchema).min(1),
+}).strict();
+
+export const createRetailerOrderSchema = z.object({
+  items: z.array(orderItemSchema).min(1),
 }).strict();
 
 export const orderParamsSchema = z.object({

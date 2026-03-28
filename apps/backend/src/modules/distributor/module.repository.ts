@@ -11,48 +11,36 @@ type TenantRecord = {
 export class DistributorRepository extends BaseRepository {
   async getTenantIdsForRetailer(retailerId: string): Promise<string[]> {
     const links = await this.db("retailer_distributor_links")
-      .where({ retailer_id: retailerId, status: "active" })
+      .where({ retailer_id: retailerId })
       .select("tenant_id");
 
     return links.map((link) => String(link.tenant_id));
   }
 
   async ensureRetailerTenantLinks(retailerId: string): Promise<string[]> {
-    const existing = await this.getTenantIdsForRetailer(retailerId);
-    if (existing.length > 0) {
-      return existing;
-    }
+    return this.getTenantIdsForRetailer(retailerId);
+  }
 
-    const defaultTenant = await this.db("tenants").orderBy("id", "asc").first<TenantRecord>("id");
-    if (!defaultTenant) {
-      return [];
-    }
+  async assertRetailerTenantLink(retailerId: string, tenantId: string) {
+    const link = await this.db("retailer_distributor_links")
+      .where({
+        retailer_id: retailerId,
+        tenant_id: tenantId,
+      })
+      .first("id", "retailer_id", "tenant_id", "created_at");
 
-    await this.db("retailer_distributor_links").insert({
-      retailer_id: retailerId,
-      tenant_id: defaultTenant.id,
-      status: "active",
-      total_orders: 0,
-      total_order_value: 0,
-      created_at: this.db.fn.now(),
-      updated_at: this.db.fn.now(),
-    });
-
-    return [String(defaultTenant.id)];
+    return link ?? null;
   }
 
   async listDistributors(retailerId: string) {
     return this.db("retailer_distributor_links")
       .join("tenants", "retailer_distributor_links.tenant_id", "tenants.id")
       .where("retailer_distributor_links.retailer_id", retailerId)
-      .where("retailer_distributor_links.status", "active")
       .select(
-        "tenants.id as tenant_id",
+        "tenants.id as id",
         "tenants.name",
         "tenants.distributor_logo_url as logo_url",
         "tenants.service_city as city",
-        "retailer_distributor_links.total_orders",
-        "retailer_distributor_links.last_ordered_at",
       );
   }
 

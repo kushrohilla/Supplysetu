@@ -34,3 +34,7 @@ export const updateProfileSchema = z.object({
   state: z.string().optional(),
   owner_name: z.string().optional(),
 });
+
+export const selectDistributorSchema = z.object({
+  distributor_id: z.string().min(1),
+});

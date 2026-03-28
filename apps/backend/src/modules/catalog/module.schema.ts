@@ -4,12 +4,16 @@ export const tenantQuerySchema = z.object({
   tenant_id: z.string().min(1),
 });
 
-export const productsQuerySchema = tenantQuerySchema.extend({
+export const tenantQueryOptionalSchema = z.object({
+  tenant_id: z.string().min(1).optional(),
+});
+
+export const productsQuerySchema = tenantQueryOptionalSchema.extend({
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(30).default(12),
 });
 
-export const searchQuerySchema = tenantQuerySchema.extend({
+export const searchQuerySchema = tenantQueryOptionalSchema.extend({
   q: z.string().min(2),
 });
 

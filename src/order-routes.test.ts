@@ -14,8 +14,11 @@ const createContainer = () =>
     },
     orderService: {
       createOrder: vi.fn(),
+      createRetailerOrder: vi.fn(),
       listOrders: vi.fn(),
+      listRetailerOrders: vi.fn(),
       getOrder: vi.fn(),
+      getRetailerOrder: vi.fn(),
       updateStatus: vi.fn(),
     },
   }) as unknown as AppContainer;
@@ -101,6 +104,43 @@ describe("order routes", () => {
     });
   });
 
+  it("creates an order for the authenticated retailer without accepting retailer_id in the payload", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const orderService = container.orderService as unknown as { createRetailerOrder: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-5",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+    orderService.createRetailerOrder.mockResolvedValue({
+      id: "order-1",
+      order_number: "ORD-000001",
+      status: "PLACED",
+      total_amount: 180,
+    });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/orders",
+      headers: { authorization: "Bearer retailer-token" },
+      payload: {
+        items: [{ product_id: "product-1", quantity: 2 }],
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(orderService.createRetailerOrder).toHaveBeenCalledWith("tenant-1", "retailer-5", {
+      items: [{ product_id: "product-1", quantity: 2 }],
+    });
+  });
+
   it("lists tenant orders", async () => {
     const container = createContainer();
     const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
@@ -133,6 +173,37 @@ describe("order routes", () => {
     });
   });
 
+  it("lists only the authenticated retailer orders for retailer tokens", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const orderService = container.orderService as unknown as { listRetailerOrders: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-5",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+    orderService.listRetailerOrders.mockResolvedValue([{ id: "order-1", order_number: "ORD-000001" }]);
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/orders",
+      headers: { authorization: "Bearer retailer-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(orderService.listRetailerOrders).toHaveBeenCalledWith("tenant-1", "retailer-5");
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: [{ id: "order-1", order_number: "ORD-000001" }],
+    });
+  });
+
   it("gets a single tenant order", async () => {
     const container = createContainer();
     const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
@@ -159,6 +230,33 @@ describe("order routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(orderService.getOrder).toHaveBeenCalledWith("tenant-1", "order-1");
+  });
+
+  it("gets a single retailer-scoped order for retailer tokens", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const orderService = container.orderService as unknown as { getRetailerOrder: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-5",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+    orderService.getRetailerOrder.mockResolvedValue({ id: "order-1", order_number: "ORD-000001" });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/orders/order-1",
+      headers: { authorization: "Bearer retailer-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(orderService.getRetailerOrder).toHaveBeenCalledWith("tenant-1", "retailer-5", "order-1");
   });
 
   it("returns 404 for cross-tenant order access", async () => {

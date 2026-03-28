@@ -17,11 +17,15 @@ declare module "fastify" {
   }
 }
 
-export const buildAuthMiddleware = () => {
+const buildParsedAuthMiddleware = ({ required }: { required: boolean }) => {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const authHeader = request.headers.authorization;
 
     if (!authHeader?.startsWith("Bearer ")) {
+      if (!required) {
+        return;
+      }
+
       return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
         success: false,
         error_code: "UNAUTHORIZED",
@@ -57,3 +61,7 @@ export const buildAuthMiddleware = () => {
     };
   };
 };
+
+export const buildAuthMiddleware = () => buildParsedAuthMiddleware({ required: true });
+
+export const buildOptionalAuthMiddleware = () => buildParsedAuthMiddleware({ required: false });

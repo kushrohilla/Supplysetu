@@ -11,9 +11,19 @@ import {
   tenantQuerySchema,
 } from "./module.schema";
 
+const getTenantId = (request: FastifyRequest, explicitTenantId?: string) => {
+  if (request.auth?.tenantId) {
+    return request.auth.tenantId;
+  }
+
+  const { tenant_id: tenantId } = tenantQuerySchema.parse({ tenant_id: explicitTenantId });
+  return tenantId;
+};
+
 export class CatalogController {
   async getBrands(request: FastifyRequest, reply: FastifyReply) {
-    const { tenant_id: tenantId } = tenantQuerySchema.parse(request.query);
+    const query = request.query as Record<string, unknown>;
+    const tenantId = getTenantId(request, typeof query.tenant_id === "string" ? query.tenant_id : undefined);
     const brands = await request.server.container.catalogService.getBrands(tenantId);
     return reply.send({ success: true, data: brands });
   }
@@ -21,7 +31,7 @@ export class CatalogController {
   async getProductsByBrand(request: FastifyRequest<{ Params: { brandId: string } }>, reply: FastifyReply) {
     const query = productsQuerySchema.parse(request.query);
     const products = await request.server.container.catalogService.getProductsByBrand(
-      query.tenant_id,
+      getTenantId(request, query.tenant_id),
       request.params.brandId,
       query.page,
       query.page_size,
@@ -31,12 +41,16 @@ export class CatalogController {
 
   async searchProducts(request: FastifyRequest, reply: FastifyReply) {
     const query = searchQuerySchema.parse(request.query);
-    const products = await request.server.container.catalogService.searchProducts(query.tenant_id, query.q);
+    const products = await request.server.container.catalogService.searchProducts(
+      getTenantId(request, query.tenant_id),
+      query.q,
+    );
     return reply.send({ success: true, data: products });
   }
 
   async getProduct(request: FastifyRequest<{ Params: { productId: string } }>, reply: FastifyReply) {
-    const { tenant_id: tenantId } = tenantQuerySchema.parse(request.query);
+    const query = request.query as Record<string, unknown>;
+    const tenantId = getTenantId(request, typeof query.tenant_id === "string" ? query.tenant_id : undefined);
     const product = await request.server.container.catalogService.getProduct(tenantId, request.params.productId);
     if (!product) {
       throw new AppError(HTTP_STATUS.NOT_FOUND, "PRODUCT_NOT_FOUND", "Product not found");

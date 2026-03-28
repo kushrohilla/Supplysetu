@@ -46,13 +46,17 @@ export type CreateOrderItemInput = {
 
 export class OrderRepository extends BaseRepository {
   async findRetailerById(tenantId: string, retailerId: string, db: DbExecutor = this.db) {
-    const retailer = await db("retailers")
-      .where({
-        id: retailerId,
-        tenant_id: tenantId,
-        is_active: true,
-      })
-      .first("id", "tenant_id", "name", "mobile_number");
+    const retailer = await db("retailer_distributor_links")
+      .join("retailers", "retailer_distributor_links.retailer_id", "retailers.id")
+      .where("retailer_distributor_links.tenant_id", tenantId)
+      .andWhere("retailer_distributor_links.retailer_id", retailerId)
+      .andWhere("retailers.is_active", true)
+      .first(
+        "retailers.id",
+        "retailer_distributor_links.tenant_id as tenant_id",
+        "retailers.name",
+        "retailers.phone as mobile_number",
+      );
 
     return retailer ?? null;
   }
@@ -116,86 +120,50 @@ export class OrderRepository extends BaseRepository {
   }
 
   async listOrders(tenantId: string, db: DbExecutor = this.db): Promise<OrderRecord[]> {
-    const rows = await db("orders")
-      .leftJoin("retailers", "orders.retailer_id", "retailers.id")
-      .leftJoin("order_items", "orders.id", "order_items.order_id")
+    const rows = await this.baseOrderListQuery(db)
       .where("orders.tenant_id", tenantId)
-      .groupBy(
-        "orders.id",
-        "orders.tenant_id",
-        "orders.retailer_id",
-        "retailers.name",
-        "orders.order_number",
-        "orders.status",
-        "orders.total_amount",
-        "orders.created_at",
-        "orders.updated_at",
-      )
-      .orderBy("orders.created_at", "desc")
-      .select(
-        "orders.id",
-        "orders.tenant_id",
-        "orders.retailer_id",
-        "retailers.name as retailer_name",
-        "orders.order_number",
-        "orders.status",
-        "orders.total_amount",
-        "orders.created_at",
-        "orders.updated_at",
-        this.db.raw("COUNT(order_items.id) as items_count"),
-      );
+      .orderBy("orders.created_at", "desc");
+
+    return rows.map((row) => this.mapOrder(row));
+  }
+
+  async listRetailerOrders(tenantId: string, retailerId: string, db: DbExecutor = this.db): Promise<OrderRecord[]> {
+    const rows = await this.baseOrderListQuery(db)
+      .where("orders.tenant_id", tenantId)
+      .andWhere("orders.retailer_id", retailerId)
+      .orderBy("orders.created_at", "desc");
 
     return rows.map((row) => this.mapOrder(row));
   }
 
   async getOrderById(tenantId: string, orderId: string, db: DbExecutor = this.db) {
-    const orderRow = await db("orders")
-      .leftJoin("retailers", "orders.retailer_id", "retailers.id")
-      .leftJoin("order_items", "orders.id", "order_items.order_id")
-      .where("orders.id", orderId)
+    const orderRow = await this.baseOrderDetailQuery(orderId, db)
       .andWhere("orders.tenant_id", tenantId)
-      .groupBy(
-        "orders.id",
-        "orders.tenant_id",
-        "orders.retailer_id",
-        "retailers.name",
-        "orders.order_number",
-        "orders.status",
-        "orders.total_amount",
-        "orders.created_at",
-        "orders.updated_at",
-      )
-      .first(
-        "orders.id",
-        "orders.tenant_id",
-        "orders.retailer_id",
-        "retailers.name as retailer_name",
-        "orders.order_number",
-        "orders.status",
-        "orders.total_amount",
-        "orders.created_at",
-        "orders.updated_at",
-        this.db.raw("COUNT(order_items.id) as items_count"),
-      );
+      .first();
 
     if (!orderRow) {
       return null;
     }
 
-    const itemRows = await db("order_items")
-      .join("tenant_products", "order_items.product_id", "tenant_products.id")
-      .leftJoin("global_brands", "tenant_products.brand_id", "global_brands.id")
-      .where("order_items.order_id", orderId)
-      .select(
-        "order_items.id",
-        "order_items.order_id",
-        "order_items.product_id",
-        "tenant_products.product_name",
-        "global_brands.name as brand_name",
-        "order_items.quantity",
-        "order_items.price",
-        "order_items.total_price",
-      );
+    const itemRows = await this.getOrderItems(orderId, db);
+
+    return {
+      ...this.mapOrder(orderRow),
+      items: itemRows.map((row) => this.mapOrderItem(row)),
+    };
+  }
+
+  async getRetailerOrderById(tenantId: string, retailerId: string, orderId: string, db: DbExecutor = this.db) {
+    const orderRow = await this.baseOrderDetailQuery(orderId, db)
+      .andWhere("orders.tenant_id", tenantId)
+      .andWhere("orders.retailer_id", retailerId)
+      .first();
+
+    if (!orderRow) {
+      return null;
+    }
+
+    const itemRows = await this.getOrderItems(orderId, db);
 
     return {
       ...this.mapOrder(orderRow),
@@ -247,5 +215,81 @@ export class OrderRepository extends BaseRepository {
       price: Number(row.price ?? 0),
       total_price: Number(row.total_price ?? 0),
     };
+  }
+
+  private baseOrderListQuery(db: DbExecutor) {
+    return db("orders")
+      .leftJoin("retailers", "orders.retailer_id", "retailers.id")
+      .leftJoin("order_items", "orders.id", "order_items.order_id")
+      .groupBy(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+      )
+      .select(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name as retailer_name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+        this.db.raw("COUNT(order_items.id) as items_count"),
+      );
+  }
+
+  private baseOrderDetailQuery(orderId: string, db: DbExecutor) {
+    return db("orders")
+      .leftJoin("retailers", "orders.retailer_id", "retailers.id")
+      .leftJoin("order_items", "orders.id", "order_items.order_id")
+      .where("orders.id", orderId)
+      .groupBy(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+      )
+      .select(
+        "orders.id",
+        "orders.tenant_id",
+        "orders.retailer_id",
+        "retailers.name as retailer_name",
+        "orders.order_number",
+        "orders.status",
+        "orders.total_amount",
+        "orders.created_at",
+        "orders.updated_at",
+        this.db.raw("COUNT(order_items.id) as items_count"),
+      );
+  }
+
+  private getOrderItems(orderId: string, db: DbExecutor) {
+    return db("order_items")
+      .join("tenant_products", "order_items.product_id", "tenant_products.id")
+      .leftJoin("global_brands", "tenant_products.brand_id", "global_brands.id")
+      .where("order_items.order_id", orderId)
+      .select(
+        "order_items.id",
+        "order_items.order_id",
+        "order_items.product_id",
+        "tenant_products.product_name",
+        "global_brands.name as brand_name",
+        "order_items.quantity",
+        "order_items.price",
+        "order_items.total_price",
+      );
   }
 }
