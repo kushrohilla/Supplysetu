@@ -12,6 +12,8 @@ import { OrderRepository } from "../../modules/order/module.repository";
 import { OrderService } from "../../modules/order/module.service";
 import { PricingRepository } from "../../modules/pricing/module.repository";
 import { PricingService } from "../../modules/pricing/module.service";
+import { RetailerRepository as TenantRetailerRepository } from "../../modules/retailer/retailer.repository";
+import { RetailerService } from "../../modules/retailer/retailer.service";
 import { EventBus } from "../../shared/event-bus";
 
 export interface AppContainer {
@@ -23,11 +25,13 @@ export interface AppContainer {
   orderService: OrderService;
   inventoryService: InventoryService;
   pricingService: PricingService;
+  retailerService: RetailerService;
 }
 
 export const createContainer = (db: Knex): AppContainer => {
   const eventBus = new EventBus();
   const retailerRepository = new RetailerRepository(db);
+  const tenantRetailerRepository = new TenantRetailerRepository(db);
   const distributorRepository = new DistributorRepository(db);
   const catalogRepository = new CatalogRepository(db);
   const inventoryRepository = new InventoryRepository(db);
@@ -43,5 +47,6 @@ export const createContainer = (db: Knex): AppContainer => {
     orderService: new OrderService(db, orderRepository, inventoryRepository, pricingRepository, eventBus),
     inventoryService: new InventoryService(inventoryRepository),
     pricingService: new PricingService(pricingRepository),
+    retailerService: new RetailerService(tenantRetailerRepository),
   };
 };

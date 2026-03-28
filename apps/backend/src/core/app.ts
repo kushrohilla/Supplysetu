@@ -9,6 +9,7 @@ import { registerDistributorRoutes } from "../modules/distributor/module.routes"
 import { registerInventoryRoutes } from "../modules/inventory/module.routes";
 import { registerOrderRoutes } from "../modules/order/module.routes";
 import { registerPricingRoutes } from "../modules/pricing/module.routes";
+import { registerRetailerRoutes } from "../modules/retailer/retailer.routes";
 import { errorHandler } from "../shared/middleware/error-handler";
 import { notFoundHandler } from "../shared/middleware/not-found-handler";
 import { createContainer } from "./config/container";
@@ -43,6 +44,7 @@ export const buildApp = async (db: Knex) => {
     await registerOrderRoutes(api);
     await registerInventoryRoutes(api);
     await registerPricingRoutes(api);
+    await registerRetailerRoutes(api);
   }, { prefix: env.API_PREFIX });
 
   app.addHook("onClose", async () => {
