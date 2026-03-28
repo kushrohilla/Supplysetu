@@ -8,6 +8,8 @@ import { DistributorRepository } from "../../modules/distributor/module.reposito
 import { DistributorService } from "../../modules/distributor/module.service";
 import { InventoryRepository } from "../../modules/inventory/module.repository";
 import { InventoryService } from "../../modules/inventory/module.service";
+import { InviteRepository } from "../../modules/invite/invite.repository";
+import { InviteService } from "../../modules/invite/invite.service";
 import { OrderRepository } from "../../modules/order/module.repository";
 import { OrderService } from "../../modules/order/module.service";
 import { PricingRepository } from "../../modules/pricing/module.repository";
@@ -26,6 +28,7 @@ export interface AppContainer {
   inventoryService: InventoryService;
   pricingService: PricingService;
   retailerService: RetailerService;
+  inviteService: InviteService;
 }
 
 export const createContainer = (db: Knex): AppContainer => {
@@ -33,6 +36,7 @@ export const createContainer = (db: Knex): AppContainer => {
   const retailerRepository = new RetailerRepository(db);
   const tenantRetailerRepository = new TenantRetailerRepository(db);
   const distributorRepository = new DistributorRepository(db);
+  const inviteRepository = new InviteRepository(db);
   const catalogRepository = new CatalogRepository(db);
   const inventoryRepository = new InventoryRepository(db);
   const pricingRepository = new PricingRepository(db);
@@ -48,5 +52,6 @@ export const createContainer = (db: Knex): AppContainer => {
     inventoryService: new InventoryService(inventoryRepository),
     pricingService: new PricingService(pricingRepository),
     retailerService: new RetailerService(tenantRetailerRepository),
+    inviteService: new InviteService(db, inviteRepository),
   };
 };
