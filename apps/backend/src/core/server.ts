@@ -31,6 +31,7 @@ const start = async () => {
         nodeEnv: env.NODE_ENV,
         port: PORT,
         dbSsl: env.DB_SSL,
+        skipMigrations: env.SKIP_MIGRATIONS,
         databaseTarget: describeDatabaseTarget(env.DATABASE_URL),
       },
       "Starting backend bootstrap",
@@ -40,7 +41,11 @@ const start = async () => {
     const db = initializeDatabase(env);
 
     // Never start accepting traffic until the schema is at the required version.
-    await runMigrations(db, logger);
+    if (env.SKIP_MIGRATIONS && env.NODE_ENV !== "production") {
+      logger.warn({}, "Skipping DB migrations because SKIP_MIGRATIONS is enabled");
+    } else {
+      await runMigrations(db, logger);
+    }
 
     const app = await buildApp(db);
 

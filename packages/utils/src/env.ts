@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { z } from "zod";
 
 dotenv.config();
+dotenv.config({ path: ".env.local", override: true });
 
 const booleanParser = z.preprocess((value) => {
   if (typeof value === "string") {
@@ -22,6 +23,12 @@ const baseEnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16).optional(),
   JWT_EXPIRES_IN: z.string().min(1).default("1d"),
   DATABASE_URL: z.string().min(1).optional(),
+  SKIP_MIGRATIONS: booleanParser.default(false),
+  DB_HOST: z.string().min(1).optional(),
+  DB_PORT: z.coerce.number().int().positive().optional(),
+  DB_NAME: z.string().min(1).optional(),
+  DB_USER: z.string().min(1).optional(),
+  DB_PASSWORD: z.string().optional(),
   DB_SSL: booleanParser.default(false),
 });
 
@@ -31,10 +38,57 @@ const DEVELOPMENT_DEFAULTS = {
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/supplysetu",
 } as const;
 
+const hasLegacyDatabaseConfig = (env: {
+  DB_HOST?: string;
+  DB_PORT?: number;
+  DB_NAME?: string;
+  DB_USER?: string;
+  DB_PASSWORD?: string;
+}) =>
+  Boolean(env.DB_HOST ?? env.DB_PORT ?? env.DB_NAME ?? env.DB_USER ?? env.DB_PASSWORD);
+
+const hasCompleteLegacyDatabaseConfig = (env: {
+  DB_HOST?: string;
+  DB_NAME?: string;
+  DB_USER?: string;
+  DB_PASSWORD?: string;
+}) => Boolean(env.DB_HOST && env.DB_NAME && env.DB_USER && env.DB_PASSWORD !== undefined);
+
+const buildLegacyDatabaseUrl = (env: {
+  DB_HOST?: string;
+  DB_PORT?: number;
+  DB_NAME?: string;
+  DB_USER?: string;
+  DB_PASSWORD?: string;
+}) => {
+  if (!hasCompleteLegacyDatabaseConfig(env)) {
+    return undefined;
+  }
+
+  const host = env.DB_HOST!;
+  const database = env.DB_NAME!;
+  const user = env.DB_USER!;
+  const password = env.DB_PASSWORD!;
+  const port = env.DB_PORT ?? 5432;
+
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(database)}`;
+};
+
 export const loadEnv = () => {
   const parsed = baseEnvSchema.superRefine((env, ctx) => {
+    const legacyDatabaseIsConfigured = hasLegacyDatabaseConfig(env);
+    const legacyDatabaseIsComplete = hasCompleteLegacyDatabaseConfig(env);
+
+    if (!env.DATABASE_URL && legacyDatabaseIsConfigured && !legacyDatabaseIsComplete) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["DATABASE_URL"],
+        message: "DATABASE_URL is missing and legacy DB_* settings are incomplete",
+      });
+    }
+
     if (env.NODE_ENV === "production") {
-      if (!env.DATABASE_URL) {
+      if (!env.DATABASE_URL && !legacyDatabaseIsComplete) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["DATABASE_URL"],
@@ -60,10 +114,12 @@ export const loadEnv = () => {
     }
   }).parse(process.env);
 
+  const legacyDatabaseUrl = buildLegacyDatabaseUrl(parsed);
+
   return {
     ...parsed,
     JWT_SECRET: parsed.JWT_SECRET ?? DEVELOPMENT_DEFAULTS.JWT_SECRET,
     JWT_REFRESH_SECRET: parsed.JWT_REFRESH_SECRET ?? DEVELOPMENT_DEFAULTS.JWT_REFRESH_SECRET,
-    DATABASE_URL: parsed.DATABASE_URL ?? DEVELOPMENT_DEFAULTS.DATABASE_URL,
+    DATABASE_URL: parsed.DATABASE_URL ?? legacyDatabaseUrl ?? DEVELOPMENT_DEFAULTS.DATABASE_URL,
   };
 };

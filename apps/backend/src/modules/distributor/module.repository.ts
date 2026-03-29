@@ -8,7 +8,24 @@ type TenantRecord = {
   distributor_logo_url?: string | null;
 };
 
+export const resolveDistributorTenantColumns = (tenantColumnNames: string[]) => ({
+  logoColumn: tenantColumnNames.includes("distributor_logo_url") ? "tenants.distributor_logo_url" : null,
+  cityColumn: tenantColumnNames.includes("service_city") ? "tenants.service_city" : null,
+});
+
 export class DistributorRepository extends BaseRepository {
+  private tenantColumnNamesPromise: Promise<string[]> | null = null;
+
+  private getTenantColumnNames() {
+    if (!this.tenantColumnNamesPromise) {
+      this.tenantColumnNamesPromise = this.db("tenants")
+        .columnInfo()
+        .then((columns) => Object.keys(columns));
+    }
+
+    return this.tenantColumnNamesPromise;
+  }
+
   async getTenantIdsForRetailer(retailerId: string): Promise<string[]> {
     const links = await this.db("retailer_distributor_links")
       .where({ retailer_id: retailerId })
@@ -33,14 +50,17 @@ export class DistributorRepository extends BaseRepository {
   }
 
   async listDistributors(retailerId: string) {
+    const tenantColumnNames = await this.getTenantColumnNames();
+    const { logoColumn, cityColumn } = resolveDistributorTenantColumns(tenantColumnNames);
+
     return this.db("retailer_distributor_links")
       .join("tenants", "retailer_distributor_links.tenant_id", "tenants.id")
       .where("retailer_distributor_links.retailer_id", retailerId)
       .select(
         "tenants.id as id",
         "tenants.name",
-        "tenants.distributor_logo_url as logo_url",
-        "tenants.service_city as city",
+        logoColumn ? `${logoColumn} as logo_url` : this.db.raw("null as logo_url"),
+        cityColumn ? `${cityColumn} as city` : this.db.raw("null as city"),
       );
   }
 

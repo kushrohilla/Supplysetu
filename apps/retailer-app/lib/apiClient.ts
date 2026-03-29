@@ -3,9 +3,8 @@ import {
   RETAILER_DEBUG_TOKEN_STORAGE_KEY,
   RETAILER_SESSION_STORAGE_KEY,
 } from "@/services/session.constants";
-
-const normalizeApiUrl = (value: string) => value.replace(/\/+$/, "");
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ? normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL) : "";
+import { resolveApiErrorMessage } from "@/services/api-error-message";
+import { env } from "@/services/env";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -39,7 +38,7 @@ export class ApiError extends Error {
 }
 
 export class ApiClient {
-  constructor(private readonly baseUrl = BASE_URL) {}
+  constructor(private readonly baseUrl = env.apiBaseUrl) {}
 
   async get<TResponse>(path: string, options?: Omit<RequestOptions, "body">) {
     return this.request<TResponse>("GET", path, options);
@@ -78,10 +77,17 @@ export class ApiClient {
     const payload = isJsonResponse ? ((await response.json()) as Record<string, unknown>) : null;
 
     if (!response.ok) {
+      const resolvedError = resolveApiErrorMessage({
+        baseUrl: this.baseUrl,
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        payload,
+      });
+
       const error = new ApiError(
         response.status,
-        String(payload?.error_code ?? "REQUEST_FAILED"),
-        String(payload?.message ?? `API request failed with status ${response.status}`),
+        typeof resolvedError === "string" ? "LOCAL_BACKEND_UNAVAILABLE" : resolvedError.code,
+        typeof resolvedError === "string" ? resolvedError : resolvedError.message,
         (payload?.details as ApiErrorDetails) ?? null,
       );
 

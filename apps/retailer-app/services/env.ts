@@ -1,7 +1,5 @@
-const normalizeApiUrl = (value: string) => value.replace(/\/+$/, "");
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+import { resolveClientApiBaseUrl } from "@/services/api-base-url";
 
 export const env = {
-  apiBaseUrl: apiUrl ? normalizeApiUrl(apiUrl) : "",
+  apiBaseUrl: resolveClientApiBaseUrl(process.env.NEXT_PUBLIC_API_URL),
 };
