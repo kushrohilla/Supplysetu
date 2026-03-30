@@ -44,7 +44,7 @@ describe("OrderService", () => {
       expect.objectContaining({
         retailer_id: "retailer-1",
         order_number: "ORD-000007",
-        status: "PLACED",
+        status: "DRAFT",
         total_amount: 290,
       }),
       [
@@ -129,29 +129,130 @@ describe("OrderService", () => {
     expect(repository.getOrderById).toHaveBeenCalledWith("tenant-1", "order-2");
   });
 
-  it("allows only the configured admin order status transitions", async () => {
+  it("allows retailers to place draft orders through the status transition service", async () => {
+    const transaction = { trx: true };
+    const db = {
+      transaction: vi.fn(async (callback: (trx: unknown) => Promise<unknown>) => callback(transaction)),
+    };
     const repository = {
-      getOrderById: vi.fn().mockResolvedValue({
+      getRetailerOrderById: vi.fn().mockResolvedValue({
         id: "order-1",
-        status: "PLACED",
+        retailer_id: "retailer-5",
+        status: "DRAFT",
       }),
       updateStatus: vi.fn().mockResolvedValue({
         id: "order-1",
+        retailer_id: "retailer-5",
+        status: "PLACED",
+      }),
+      createHistoryEntry: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new OrderService(db as never, repository as never);
+    const result = await service.updateStatus({
+      tenantId: "tenant-1",
+      orderId: "order-1",
+      nextStatus: "PLACED",
+      actorRole: "retailer",
+      actorId: "retailer-5",
+      retailerId: "retailer-5",
+    });
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(repository.getRetailerOrderById).toHaveBeenCalledWith("tenant-1", "retailer-5", "order-1", transaction);
+    expect(repository.updateStatus).toHaveBeenCalledWith("tenant-1", "order-1", "PLACED", transaction);
+    expect(repository.createHistoryEntry).toHaveBeenCalledWith(
+      {
+        order_id: "order-1",
+        from_status: "DRAFT",
+        to_status: "PLACED",
+        actor_role: "retailer",
+        actor_id: "retailer-5",
+      },
+      transaction,
+    );
+    expect(result).toMatchObject({
+      id: "order-1",
+      status: "PLACED",
+    });
+  });
+
+  it("allows admins to move confirmed orders to invoiced", async () => {
+    const transaction = { trx: true };
+    const db = {
+      transaction: vi.fn(async (callback: (trx: unknown) => Promise<unknown>) => callback(transaction)),
+    };
+    const repository = {
+      getOrderById: vi.fn().mockResolvedValue({
+        id: "order-1",
+        status: "CONFIRMED",
+      }),
+      updateStatus: vi.fn().mockResolvedValue({
+        id: "order-1",
+        status: "INVOICED",
+      }),
+      createHistoryEntry: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new OrderService(db as never, repository as never);
+    const result = await service.updateStatus({
+      tenantId: "tenant-1",
+      orderId: "order-1",
+      nextStatus: "INVOICED",
+      actorRole: "admin",
+      actorId: "user-1",
+    });
+
+    expect(repository.updateStatus).toHaveBeenCalledWith("tenant-1", "order-1", "INVOICED", transaction);
+    expect(repository.createHistoryEntry).toHaveBeenCalledWith(
+      {
+        order_id: "order-1",
+        from_status: "CONFIRMED",
+        to_status: "INVOICED",
+        actor_role: "admin",
+        actor_id: "user-1",
+      },
+      transaction,
+    );
+    expect(result).toMatchObject({
+      id: "order-1",
+      status: "INVOICED",
+    });
+  });
+
+  it("rejects retailer transitions to admin-only lifecycle states", async () => {
+    const db = {
+      transaction: vi.fn(async (callback: (trx: unknown) => Promise<unknown>) => callback({ trx: true })),
+    };
+    const repository = {
+      getRetailerOrderById: vi.fn().mockResolvedValue({
+        id: "order-1",
+        retailer_id: "retailer-5",
         status: "CONFIRMED",
       }),
     };
 
-    const service = new OrderService({} as never, repository as never);
-    const result = await service.updateStatus("tenant-1", "order-1", "CONFIRMED");
+    const service = new OrderService(db as never, repository as never);
 
-    expect(repository.updateStatus).toHaveBeenCalledWith("tenant-1", "order-1", "CONFIRMED");
-    expect(result).toMatchObject({
-      id: "order-1",
-      status: "CONFIRMED",
+    await expect(
+      service.updateStatus({
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        nextStatus: "INVOICED",
+        actorRole: "retailer",
+        actorId: "retailer-5",
+        retailerId: "retailer-5",
+      }),
+    ).rejects.toMatchObject({
+      code: "ORDER_STATUS_FORBIDDEN",
+      statusCode: HTTP_STATUS.FORBIDDEN,
     });
   });
 
   it("rejects invalid admin order status transitions", async () => {
+    const db = {
+      transaction: vi.fn(async (callback: (trx: unknown) => Promise<unknown>) => callback({ trx: true })),
+    };
     const repository = {
       getOrderById: vi.fn().mockResolvedValue({
         id: "order-1",
@@ -159,8 +260,52 @@ describe("OrderService", () => {
       }),
     };
 
-    const service = new OrderService({} as never, repository as never);
+    const service = new OrderService(db as never, repository as never);
 
-    await expect(service.updateStatus("tenant-1", "order-1", "PLACED")).rejects.toBeInstanceOf(AppError);
+    await expect(
+      service.updateStatus({
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        nextStatus: "PLACED",
+        actorRole: "admin",
+        actorId: "user-1",
+      }),
+    ).rejects.toMatchObject({
+      code: "INVALID_TRANSITION",
+      statusCode: HTTP_STATUS.CONFLICT,
+    });
+  });
+
+  it("lists order history for a tenant-scoped order", async () => {
+    const repository = {
+      getOrderById: vi.fn().mockResolvedValue({
+        id: "order-1",
+        status: "DISPATCHED",
+      }),
+      listHistory: vi.fn().mockResolvedValue([
+        {
+          id: "history-1",
+          order_id: "order-1",
+          from_status: "PACKED",
+          to_status: "DISPATCHED",
+          actor_role: "admin",
+          actor_id: "user-1",
+          created_at: "2026-03-30T10:00:00.000Z",
+        },
+      ]),
+    };
+
+    const service = new OrderService({} as never, repository as never);
+    const result = await service.getOrderHistory("tenant-1", "order-1");
+
+    expect(repository.getOrderById).toHaveBeenCalledWith("tenant-1", "order-1");
+    expect(repository.listHistory).toHaveBeenCalledWith("tenant-1", "order-1");
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "history-1",
+        to_status: "DISPATCHED",
+        actor_role: "admin",
+      }),
+    ]);
   });
 });

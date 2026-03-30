@@ -9,6 +9,11 @@ export const registerOrderRoutes = async (fastify: FastifyInstance) => {
 
   fastify.post("/orders", { preHandler: authenticate }, controller.createOrder.bind(controller));
   fastify.get("/orders", { preHandler: authenticate }, controller.listOrders.bind(controller));
+  fastify.get<{ Params: { id: string } }>(
+    "/orders/:id/history",
+    { preHandler: authenticate },
+    controller.getHistory.bind(controller),
+  );
   fastify.get<{ Params: { id: string } }>("/orders/:id", { preHandler: authenticate }, controller.getOrder.bind(controller));
   fastify.patch<{ Params: { id: string } }>("/orders/:id/status", { preHandler: authenticate }, controller.updateStatus.bind(controller));
 };

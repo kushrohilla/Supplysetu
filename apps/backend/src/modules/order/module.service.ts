@@ -3,7 +3,14 @@ import type { Knex } from "knex";
 import { HTTP_STATUS } from "../../shared/constants/http-status";
 import { AppError } from "../../shared/errors/app-error";
 import type { OrderRepository } from "./module.repository";
-import { ORDER_STATUS, canTransitionOrderStatus, type OrderStatus } from "./order-status";
+import {
+  ORDER_STATUS,
+  canActorTransitionOrderStatus,
+  canTransitionOrderStatus,
+  getAllowedNextOrderStatuses,
+  type OrderStatus,
+  type OrderStatusActorRole,
+} from "./order-status";
 
 type CreateOrderItemPayload = {
   product_id: string;
@@ -17,6 +24,15 @@ type CreateOrderPayload = {
 
 type CreateRetailerOrderPayload = {
   items: CreateOrderItemPayload[];
+};
+
+export type UpdateOrderStatusInput = {
+  tenantId: string;
+  orderId: string;
+  nextStatus: OrderStatus;
+  actorRole: OrderStatusActorRole;
+  actorId: string | null;
+  retailerId?: string;
 };
 
 export class OrderService {
@@ -59,26 +75,71 @@ export class OrderService {
     return order;
   }
 
-  async updateStatus(tenantId: string, orderId: string, nextStatus: OrderStatus) {
-    const order = await this.orderRepository.getOrderById(tenantId, orderId);
-    if (!order) {
-      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
-    }
+  async getOrderHistory(tenantId: string, orderId: string) {
+    await this.getOrder(tenantId, orderId);
+    return this.orderRepository.listHistory(tenantId, orderId);
+  }
 
-    if (!canTransitionOrderStatus(order.status, nextStatus)) {
-      throw new AppError(
-        HTTP_STATUS.CONFLICT,
-        "INVALID_ORDER_STATUS_TRANSITION",
-        `Cannot transition order from ${order.status} to ${nextStatus}`,
+  async getRetailerOrderHistory(tenantId: string, retailerId: string, orderId: string) {
+    await this.getRetailerOrder(tenantId, retailerId, orderId);
+    return this.orderRepository.listHistory(tenantId, orderId);
+  }
+
+  async updateStatus(input: UpdateOrderStatusInput) {
+    return this.db.transaction(async (trx) => {
+      const order =
+        input.actorRole === "retailer"
+          ? await this.orderRepository.getRetailerOrderById(input.tenantId, input.retailerId ?? "", input.orderId, trx)
+          : await this.orderRepository.getOrderById(input.tenantId, input.orderId, trx);
+
+      if (!order) {
+        throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
+      }
+
+      if (!canActorTransitionOrderStatus(input.actorRole, order.status, input.nextStatus)) {
+        throw new AppError(
+          HTTP_STATUS.FORBIDDEN,
+          "ORDER_STATUS_FORBIDDEN",
+          `Actor ${input.actorRole} cannot transition order from ${order.status} to ${input.nextStatus}`,
+          {
+            actor_role: input.actorRole,
+            current_status: order.status,
+            next_status: input.nextStatus,
+          },
+        );
+      }
+
+      if (!canTransitionOrderStatus(order.status, input.nextStatus)) {
+        throw new AppError(
+          HTTP_STATUS.CONFLICT,
+          "INVALID_TRANSITION",
+          `Cannot transition order from ${order.status} to ${input.nextStatus}`,
+          {
+            current_status: order.status,
+            next_status: input.nextStatus,
+            allowed_next_statuses: getAllowedNextOrderStatuses(order.status),
+          },
+        );
+      }
+
+      const updated = await this.orderRepository.updateStatus(input.tenantId, input.orderId, input.nextStatus, trx);
+      if (!updated) {
+        throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
+      }
+
+      await this.orderRepository.createHistoryEntry(
+        {
+          order_id: input.orderId,
+          from_status: order.status,
+          to_status: input.nextStatus,
+          actor_role: input.actorRole,
+          actor_id: input.actorId,
+        },
+        trx,
       );
-    }
 
-    const updated = await this.orderRepository.updateStatus(tenantId, orderId, nextStatus);
-    if (!updated) {
-      throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
-    }
-
-    return updated;
+      return updated;
+    });
   }
 
   private async createTenantOrder(tenantId: string, retailerId: string, items: CreateOrderItemPayload[]) {
@@ -124,7 +185,7 @@ export class OrderService {
         {
           retailer_id: retailerId,
           order_number: orderNumber,
-          status: ORDER_STATUS.PLACED,
+          status: ORDER_STATUS.DRAFT,
           total_amount: totalAmount,
         },
         orderItems,

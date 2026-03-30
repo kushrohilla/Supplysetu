@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ORDER_STATUS_VALUES } from "./order-status";
+
 const orderItemSchema = z.object({
   product_id: z.string().min(1),
   quantity: z.coerce.number().int().positive(),
@@ -19,5 +21,5 @@ export const orderParamsSchema = z.object({
 });
 
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(["DRAFT", "PLACED", "CONFIRMED", "CANCELLED"]),
+  status: z.enum(ORDER_STATUS_VALUES),
 }).strict();

@@ -28,6 +28,11 @@ const buildParsedAuthMiddleware = ({ required }: { required: boolean }) => {
 
       return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
         success: false,
+        data: null,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Missing authorization token",
+        },
         error_code: "UNAUTHORIZED",
         message: "Missing authorization token",
         details: null,
@@ -41,6 +46,11 @@ const buildParsedAuthMiddleware = ({ required }: { required: boolean }) => {
     if (!payload) {
       return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
         success: false,
+        data: null,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Invalid authorization token",
+        },
         error_code: "UNAUTHORIZED",
         message: "Invalid authorization token",
         details: null,

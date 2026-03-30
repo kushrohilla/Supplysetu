@@ -20,6 +20,8 @@ const createContainer = () =>
       getOrder: vi.fn(),
       getRetailerOrder: vi.fn(),
       updateStatus: vi.fn(),
+      getOrderHistory: vi.fn(),
+      getRetailerOrderHistory: vi.fn(),
     },
   }) as unknown as AppContainer;
 
@@ -42,7 +44,7 @@ describe("order routes", () => {
     orderService.createOrder.mockResolvedValue({
       id: "order-1",
       order_number: "ORD-000001",
-      status: "PLACED",
+      status: "DRAFT",
       total_amount: 500,
     });
 
@@ -117,7 +119,7 @@ describe("order routes", () => {
     orderService.createRetailerOrder.mockResolvedValue({
       id: "order-1",
       order_number: "ORD-000001",
-      status: "PLACED",
+      status: "DRAFT",
       total_amount: 180,
     });
 
@@ -323,7 +325,161 @@ describe("order routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(orderService.updateStatus).toHaveBeenCalledWith("tenant-1", "order-1", "CONFIRMED");
+    expect(orderService.updateStatus).toHaveBeenCalledWith({
+      tenantId: "tenant-1",
+      orderId: "order-1",
+      nextStatus: "CONFIRMED",
+      actorRole: "admin",
+      actorId: "user-1",
+    });
+  });
+
+  it("allows retailers to place a draft order through the status route", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const orderService = container.orderService as unknown as { updateStatus: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-5",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+    orderService.updateStatus.mockResolvedValue({
+      id: "order-1",
+      status: "PLACED",
+    });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/orders/order-1/status",
+      headers: { authorization: "Bearer retailer-token" },
+      payload: {
+        status: "PLACED",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(orderService.updateStatus).toHaveBeenCalledWith({
+      tenantId: "tenant-1",
+      orderId: "order-1",
+      nextStatus: "PLACED",
+      actorRole: "retailer",
+      actorId: "retailer-5",
+      retailerId: "retailer-5",
+    });
+  });
+
+  it("rejects unknown token types for status updates instead of treating them as admin", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      tenantId: "tenant-1",
+      tokenType: "service",
+    });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/orders/order-1/status",
+      headers: { authorization: "Bearer service-token" },
+      payload: {
+        status: "CONFIRMED",
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      success: false,
+      data: null,
+      error_code: "UNAUTHORIZED",
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Unauthorized",
+      },
+    });
+  });
+
+  it("returns tenant-scoped order history for admins", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const orderService = container.orderService as unknown as { getOrderHistory: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      userId: "user-1",
+      tenantId: "tenant-1",
+      tokenType: "admin",
+      role: "distributor_admin",
+    });
+    orderService.getOrderHistory.mockResolvedValue([
+      {
+        id: "history-1",
+        order_id: "order-1",
+        from_status: "PACKED",
+        to_status: "DISPATCHED",
+      },
+    ]);
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/orders/order-1/history",
+      headers: { authorization: "Bearer admin-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(orderService.getOrderHistory).toHaveBeenCalledWith("tenant-1", "order-1");
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: [{ id: "history-1", to_status: "DISPATCHED" }],
+    });
+  });
+
+  it("returns retailer-scoped order history for retailer tokens", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const orderService = container.orderService as unknown as { getRetailerOrderHistory: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-5",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+    orderService.getRetailerOrderHistory.mockResolvedValue([
+      {
+        id: "history-1",
+        order_id: "order-1",
+        from_status: "DRAFT",
+        to_status: "PLACED",
+      },
+    ]);
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerOrderRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/orders/order-1/history",
+      headers: { authorization: "Bearer retailer-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(orderService.getRetailerOrderHistory).toHaveBeenCalledWith("tenant-1", "retailer-5", "order-1");
   });
 
   it("rejects invalid order status payloads", async () => {
@@ -347,14 +503,19 @@ describe("order routes", () => {
       url: "/orders/order-1/status",
       headers: { authorization: "Bearer admin-token" },
       payload: {
-        status: "DISPATCHED",
+        status: "UNKNOWN",
       },
     });
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({
       success: false,
+      data: null,
       error_code: "VALIDATION_ERROR",
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Request validation failed",
+      },
     });
   });
 });

@@ -2,9 +2,55 @@ import crypto from "crypto";
 import type { Knex } from "knex";
 
 import { BaseRepository } from "../../shared/base-repository";
-import type { OrderStatus } from "./order-status";
+import { ORDER_STATUS, type OrderStatus, type OrderStatusActorRole } from "./order-status";
 
 type DbExecutor = Knex | Knex.Transaction;
+
+const toIsoStringOrNull = (value: unknown) => {
+  if (!value) {
+    return null;
+  }
+
+  return new Date(String(value)).toISOString();
+};
+
+type OrderRow = {
+  id: string;
+  tenant_id: string;
+  retailer_id: string;
+  retailer_name?: string | null;
+  order_number: string;
+  status: OrderStatus;
+  total_amount: number | string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+  packed_at?: string | Date | null;
+  dispatched_at?: string | Date | null;
+  delivered_at?: string | Date | null;
+  closed_at?: string | Date | null;
+  items_count?: number | string;
+};
+
+type OrderItemRow = {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_name: string;
+  brand_name?: string | null;
+  quantity: number | string;
+  price: number | string;
+  total_price: number | string;
+};
+
+type OrderHistoryRow = {
+  id: string;
+  order_id: string;
+  from_status: OrderStatus;
+  to_status: OrderStatus;
+  actor_role: OrderStatusActorRole;
+  actor_id?: string | null;
+  created_at: string | Date;
+};
 
 export type OrderRecord = {
   id: string;
@@ -16,6 +62,10 @@ export type OrderRecord = {
   total_amount: number;
   created_at: string;
   updated_at: string;
+  packed_at: string | null;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+  closed_at: string | null;
   items_count?: number;
 };
 
@@ -30,6 +80,16 @@ export type OrderItemRecord = {
   total_price: number;
 };
 
+export type OrderHistoryRecord = {
+  id: string;
+  order_id: string;
+  from_status: OrderStatus;
+  to_status: OrderStatus;
+  actor_role: OrderStatusActorRole;
+  actor_id: string | null;
+  created_at: string;
+};
+
 export type CreateOrderInput = {
   retailer_id: string;
   order_number: string;
@@ -42,6 +102,14 @@ export type CreateOrderItemInput = {
   quantity: number;
   price: number;
   total_price: number;
+};
+
+export type CreateOrderHistoryInput = {
+  order_id: string;
+  from_status: OrderStatus;
+  to_status: OrderStatus;
+  actor_role: OrderStatusActorRole;
+  actor_id: string | null;
 };
 
 export class OrderRepository extends BaseRepository {
@@ -79,10 +147,13 @@ export class OrderRepository extends BaseRepository {
       );
   }
 
-  async getNextOrderSequence(_tenantId: string, db: DbExecutor = this.db) {
+  async getNextOrderSequence(tenantId: string, db: DbExecutor = this.db) {
     await db.raw("SELECT pg_advisory_xact_lock(?, ?)", [2026, 328]);
 
-    const row = await db("orders").count<{ count: string }>({ count: "*" }).first();
+    const row = await db("orders")
+      .where("tenant_id", tenantId)
+      .count<{ count: string }>({ count: "*" })
+      .first();
     return Number(row?.count ?? 0) + 1;
   }
 
@@ -124,7 +195,7 @@ export class OrderRepository extends BaseRepository {
       .where("orders.tenant_id", tenantId)
       .orderBy("orders.created_at", "desc");
 
-    return rows.map((row) => this.mapOrder(row));
+    return rows.map((row) => this.mapOrder(row as OrderRow));
   }
 
   async listRetailerOrders(tenantId: string, retailerId: string, db: DbExecutor = this.db): Promise<OrderRecord[]> {
@@ -133,7 +204,7 @@ export class OrderRepository extends BaseRepository {
       .andWhere("orders.retailer_id", retailerId)
       .orderBy("orders.created_at", "desc");
 
-    return rows.map((row) => this.mapOrder(row));
+    return rows.map((row) => this.mapOrder(row as OrderRow));
   }
 
   async getOrderById(tenantId: string, orderId: string, db: DbExecutor = this.db) {
@@ -148,7 +219,7 @@ export class OrderRepository extends BaseRepository {
     const itemRows = await this.getOrderItems(orderId, db);
 
     return {
-      ...this.mapOrder(orderRow),
+      ...this.mapOrder(orderRow as OrderRow),
       items: itemRows.map((row) => this.mapOrderItem(row)),
     };
   }
@@ -166,12 +237,13 @@ export class OrderRepository extends BaseRepository {
     const itemRows = await this.getOrderItems(orderId, db);
 
     return {
-      ...this.mapOrder(orderRow),
+      ...this.mapOrder(orderRow as OrderRow),
       items: itemRows.map((row) => this.mapOrderItem(row)),
     };
   }
 
   async updateStatus(tenantId: string, orderId: string, status: OrderStatus, db: DbExecutor = this.db) {
+    const lifecyclePatch = this.getLifecycleTimestampPatch(status);
     const updatedCount = await db("orders")
       .where({
         id: orderId,
@@ -180,6 +252,7 @@ export class OrderRepository extends BaseRepository {
       .update({
         status,
         updated_at: this.db.fn.now(),
+        ...lifecyclePatch,
       });
 
     if (!updatedCount) {
@@ -189,7 +262,53 @@ export class OrderRepository extends BaseRepository {
     return this.getOrderById(tenantId, orderId, db);
   }
 
-  private mapOrder(row: any): OrderRecord {
+  async createHistoryEntry(input: CreateOrderHistoryInput, db: DbExecutor = this.db) {
+    await db("order_history").insert({
+      id: crypto.randomUUID(),
+      order_id: input.order_id,
+      from_status: input.from_status,
+      to_status: input.to_status,
+      actor_role: input.actor_role,
+      actor_id: input.actor_id,
+      created_at: this.db.fn.now(),
+    });
+  }
+
+  async listHistory(tenantId: string, orderId: string, db: DbExecutor = this.db): Promise<OrderHistoryRecord[]> {
+    const rows = await db("order_history")
+      .join("orders", "order_history.order_id", "orders.id")
+      .where("orders.tenant_id", tenantId)
+      .andWhere("order_history.order_id", orderId)
+      .orderBy("order_history.created_at", "asc")
+      .select(
+        "order_history.id",
+        "order_history.order_id",
+        "order_history.from_status",
+        "order_history.to_status",
+        "order_history.actor_role",
+        "order_history.actor_id",
+        "order_history.created_at",
+      );
+
+    return rows.map((row) => this.mapOrderHistory(row));
+  }
+
+  private getLifecycleTimestampPatch(status: OrderStatus) {
+    switch (status) {
+      case ORDER_STATUS.PACKED:
+        return { packed_at: this.db.fn.now() };
+      case ORDER_STATUS.DISPATCHED:
+        return { dispatched_at: this.db.fn.now() };
+      case ORDER_STATUS.DELIVERED:
+        return { delivered_at: this.db.fn.now() };
+      case ORDER_STATUS.CLOSED:
+        return { closed_at: this.db.fn.now() };
+      default:
+        return {};
+    }
+  }
+
+  private mapOrder(row: OrderRow): OrderRecord {
     return {
       id: String(row.id),
       tenant_id: String(row.tenant_id),
@@ -200,11 +319,15 @@ export class OrderRepository extends BaseRepository {
       total_amount: Number(row.total_amount ?? 0),
       created_at: new Date(row.created_at).toISOString(),
       updated_at: new Date(row.updated_at).toISOString(),
+      packed_at: toIsoStringOrNull(row.packed_at),
+      dispatched_at: toIsoStringOrNull(row.dispatched_at),
+      delivered_at: toIsoStringOrNull(row.delivered_at),
+      closed_at: toIsoStringOrNull(row.closed_at),
       items_count: row.items_count === undefined ? undefined : Number(row.items_count ?? 0),
     };
   }
 
-  private mapOrderItem(row: any): OrderItemRecord {
+  private mapOrderItem(row: OrderItemRow): OrderItemRecord {
     return {
       id: String(row.id),
       order_id: String(row.order_id),
@@ -214,6 +337,18 @@ export class OrderRepository extends BaseRepository {
       quantity: Number(row.quantity ?? 0),
       price: Number(row.price ?? 0),
       total_price: Number(row.total_price ?? 0),
+    };
+  }
+
+  private mapOrderHistory(row: OrderHistoryRow): OrderHistoryRecord {
+    return {
+      id: String(row.id),
+      order_id: String(row.order_id),
+      from_status: row.from_status,
+      to_status: row.to_status,
+      actor_role: row.actor_role,
+      actor_id: row.actor_id ? String(row.actor_id) : null,
+      created_at: new Date(row.created_at).toISOString(),
     };
   }
 
@@ -231,6 +366,10 @@ export class OrderRepository extends BaseRepository {
         "orders.total_amount",
         "orders.created_at",
         "orders.updated_at",
+        "orders.packed_at",
+        "orders.dispatched_at",
+        "orders.delivered_at",
+        "orders.closed_at",
       )
       .select(
         "orders.id",
@@ -242,8 +381,12 @@ export class OrderRepository extends BaseRepository {
         "orders.total_amount",
         "orders.created_at",
         "orders.updated_at",
-        this.db.raw("COUNT(order_items.id) as items_count"),
-      );
+        "orders.packed_at",
+        "orders.dispatched_at",
+        "orders.delivered_at",
+        "orders.closed_at",
+      )
+      .count({ items_count: "order_items.id" });
   }
 
   private baseOrderDetailQuery(orderId: string, db: DbExecutor) {
@@ -261,6 +404,10 @@ export class OrderRepository extends BaseRepository {
         "orders.total_amount",
         "orders.created_at",
         "orders.updated_at",
+        "orders.packed_at",
+        "orders.dispatched_at",
+        "orders.delivered_at",
+        "orders.closed_at",
       )
       .select(
         "orders.id",
@@ -272,8 +419,12 @@ export class OrderRepository extends BaseRepository {
         "orders.total_amount",
         "orders.created_at",
         "orders.updated_at",
-        this.db.raw("COUNT(order_items.id) as items_count"),
-      );
+        "orders.packed_at",
+        "orders.dispatched_at",
+        "orders.delivered_at",
+        "orders.closed_at",
+      )
+      .count({ items_count: "order_items.id" });
   }
 
   private getOrderItems(orderId: string, db: DbExecutor) {
