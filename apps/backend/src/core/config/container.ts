@@ -49,7 +49,7 @@ export const createContainer = (db: Knex): AppContainer => {
     distributorService: new DistributorService(distributorRepository),
     catalogService: new CatalogService(catalogRepository),
     orderService: new OrderService(db, orderRepository),
-    inventoryService: new InventoryService(inventoryRepository),
+    inventoryService: new InventoryService(db, inventoryRepository),
     pricingService: new PricingService(pricingRepository),
     retailerService: new RetailerService(tenantRetailerRepository),
     inviteService: new InviteService(db, inviteRepository),
