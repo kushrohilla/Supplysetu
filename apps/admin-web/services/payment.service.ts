@@ -44,16 +44,17 @@ class PaymentService {
   }
 
   async fetchRetailerCreditSummary(retailerId: string): Promise<RetailerCreditSummary> {
-    return apiService.request<RetailerCreditSummary>(`/admin/retailers/${retailerId}/credit-summary`, {
-      method: "GET",
-    });
+    return apiService.request<RetailerCreditSummary>(
+      `/admin/retailers/${encodeURIComponent(retailerId)}/credit-summary`,
+      { method: "GET" },
+    );
   }
 
   async updateRetailerCreditLimit(retailerId: string, creditLimit: number): Promise<RetailerCreditLimitResponse> {
-    return apiService.request<RetailerCreditLimitResponse>(`/admin/retailers/${retailerId}/credit-limit`, {
-      method: "PATCH",
-      body: { credit_limit: creditLimit },
-    });
+    return apiService.request<RetailerCreditLimitResponse>(
+      `/admin/retailers/${encodeURIComponent(retailerId)}/credit-limit`,
+      { method: "PATCH", body: { credit_limit: creditLimit } },
+    );
   }
 }
 

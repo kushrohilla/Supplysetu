@@ -29,6 +29,27 @@ const isUniqueViolation = (error: unknown) =>
   "code" in error &&
   error.code === "23505";
 
+/**
+ * Normalize and validate the paid_at date string.
+ * Returns a valid ISO timestamp. Throws if the input is not a valid date.
+ */
+const normalizePaidAt = (paidAt: string | undefined): string => {
+  if (!paidAt) {
+    return new Date().toISOString();
+  }
+
+  const parsed = new Date(paidAt);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError(
+      HTTP_STATUS.BAD_REQUEST,
+      "INVALID_PAID_AT",
+      "paid_at must be a valid ISO 8601 datetime string.",
+    );
+  }
+
+  return parsed.toISOString();
+};
+
 export class PaymentsService {
   constructor(
     private readonly db: Knex,
@@ -36,6 +57,7 @@ export class PaymentsService {
   ) {}
 
   async recordPayment(input: RecordPaymentInput): Promise<PaymentRecord> {
+    // Fast-path idempotency check outside transaction to avoid unnecessary locking.
     if (input.idempotencyKey) {
       const existing = await this.paymentsRepository.findPaymentByIdempotencyKey(input.tenantId, input.idempotencyKey);
       if (existing) {
@@ -43,8 +65,12 @@ export class PaymentsService {
       }
     }
 
+    // Validate and normalize paid_at before entering the transaction.
+    const normalizedPaidAt = normalizePaidAt(input.paidAt);
+
     try {
       return await this.db.transaction(async (trx) => {
+        // Re-check idempotency inside transaction to handle races.
         if (input.idempotencyKey) {
           const existing = await this.paymentsRepository.findPaymentByIdempotencyKey(input.tenantId, input.idempotencyKey, trx);
           if (existing) {
@@ -52,6 +78,7 @@ export class PaymentsService {
           }
         }
 
+        // Tenant-scoped order lookup — ensures cross-tenant access is impossible.
         const order = await this.paymentsRepository.findOrderForPayment(input.tenantId, input.orderId, trx);
         if (!order) {
           throw new AppError(HTTP_STATUS.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found");
@@ -64,12 +91,13 @@ export class PaymentsService {
           amount: input.amount,
           paymentMode: input.paymentMode,
           referenceNote: input.referenceNote?.trim() || null,
-          paidAt: input.paidAt ?? new Date().toISOString(),
+          paidAt: normalizedPaidAt,
           actorId: input.actorId,
           idempotencyKey: input.idempotencyKey,
         }, trx);
       });
     } catch (error) {
+      // Handle unique constraint race on idempotency_key — return existing record.
       if (input.idempotencyKey && isUniqueViolation(error)) {
         const existing = await this.paymentsRepository.findPaymentByIdempotencyKey(input.tenantId, input.idempotencyKey);
         if (existing) {

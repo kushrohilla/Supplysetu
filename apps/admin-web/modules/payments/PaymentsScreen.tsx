@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, startTransition, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useRef, startTransition, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/empty-state";
@@ -91,6 +91,10 @@ export function PaymentsScreen() {
   const [modalPaymentMode, setModalPaymentMode] = useState<PaymentMode>("advance");
   const [modalNote, setModalNote] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSuccess, setModalSuccess] = useState(false);
+
+  // Ref to guard duplicate submissions at the UI level (belt-and-suspenders with backend idempotency).
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     const loadStaticData = async () => {
@@ -193,6 +197,7 @@ export function PaymentsScreen() {
     setModalPaymentMode("advance");
     setModalNote("");
     setModalError(null);
+    setModalSuccess(false);
   };
 
   const refreshPayments = async (retailerId = selectedRetailerId, nextPage = page) => {
@@ -222,6 +227,7 @@ export function PaymentsScreen() {
     setModalPaymentMode("advance");
     setModalNote("");
     setModalError(null);
+    setModalSuccess(false);
   };
 
   const closeRecordModal = () => {
@@ -239,7 +245,7 @@ export function PaymentsScreen() {
 
   const onSaveCreditLimit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!creditRetailerId) {
+    if (!creditRetailerId || creditSaving) {
       return;
     }
 
@@ -279,6 +285,11 @@ export function PaymentsScreen() {
   const onRecordPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    // Prevent double submission via both state and ref lock.
+    if (recording || submitLockRef.current) {
+      return;
+    }
+
     if (!modalRetailerId) {
       setModalError("Select a retailer first.");
       return;
@@ -295,8 +306,10 @@ export function PaymentsScreen() {
       return;
     }
 
+    submitLockRef.current = true;
     setRecording(true);
     setModalError(null);
+    setModalSuccess(false);
     setFeedback(null);
 
     try {
@@ -310,6 +323,7 @@ export function PaymentsScreen() {
         crypto.randomUUID(),
       );
 
+      setModalSuccess(true);
       await refreshPayments();
       if (creditRetailerId) {
         const summary = await paymentService.fetchRetailerCreditSummary(creditRetailerId);
@@ -317,7 +331,8 @@ export function PaymentsScreen() {
         setCreditLimitInput((summary.credit_limit / 100).toFixed(2));
       }
       setFeedback("Payment recorded successfully.");
-      closeRecordModal();
+      // Delay close so user sees success feedback in modal.
+      setTimeout(() => closeRecordModal(), 700);
     } catch (recordError) {
       if (handleAuthError(recordError)) {
         return;
@@ -326,6 +341,7 @@ export function PaymentsScreen() {
       setModalError(getApiErrorMessage(recordError, "Unable to record payment."));
     } finally {
       setRecording(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -368,27 +384,34 @@ export function PaymentsScreen() {
         </div>
       </div>
 
+      {/* ── Summary Cards ─────────────────────────────────────────────── */}
       <section className="grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs uppercase tracking-wide text-slate-500">Total Outstanding</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">
             {formatCurrencyFromPaise(payments.summary.total_outstanding)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Net unpaid balance after recorded payments.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Net unpaid order balance after all recorded payments.
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs uppercase tracking-wide text-slate-500">Advance Collected Today</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">
             {formatCurrencyFromPaise(payments.summary.advance_collected_today)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Advance-mode collections recorded today.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Sum of advance-mode payments recorded today (server time).
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs uppercase tracking-wide text-slate-500">COD Pending</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900">
             {formatCurrencyFromPaise(payments.summary.cod_pending)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Outstanding balance on COD orders only.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Outstanding balance on COD-mode orders only.
+          </p>
         </div>
       </section>
 
@@ -396,6 +419,7 @@ export function PaymentsScreen() {
       {error ? <div className="rounded-md bg-rose-100 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        {/* ── Payment History Table ──────────────────────────────────── */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900">Payment history</h2>
@@ -421,18 +445,18 @@ export function PaymentsScreen() {
                 <table className="w-full min-w-[720px] border-collapse text-sm">
                   <thead className="bg-slate-50 text-left text-slate-600">
                     <tr>
-                      <th className="border-b border-slate-200 px-4 py-3 font-medium">Retailer Name</th>
-                      <th className="border-b border-slate-200 px-4 py-3 font-medium">Order ID</th>
+                      <th className="border-b border-slate-200 px-4 py-3 font-medium">Retailer</th>
+                      <th className="border-b border-slate-200 px-4 py-3 font-medium">Order</th>
                       <th className="border-b border-slate-200 px-4 py-3 font-medium">Amount</th>
                       <th className="border-b border-slate-200 px-4 py-3 font-medium">Mode</th>
-                      <th className="border-b border-slate-200 px-4 py-3 font-medium">Date</th>
+                      <th className="border-b border-slate-200 px-4 py-3 font-medium">Paid At</th>
                     </tr>
                   </thead>
                   <tbody>
                     {payments.items.map((payment) => (
                       <tr key={payment.id} className="border-b border-slate-100 last:border-b-0">
                         <td className="px-4 py-3 font-medium text-slate-900">{payment.retailer_name}</td>
-                        <td className="px-4 py-3 text-slate-700">{payment.order_id}</td>
+                        <td className="px-4 py-3 text-slate-700 font-mono text-xs">{payment.order_id.slice(0, 8)}…</td>
                         <td className="px-4 py-3 text-slate-700">{formatCurrencyFromPaise(payment.amount)}</td>
                         <td className="px-4 py-3 text-slate-700">
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
@@ -453,6 +477,7 @@ export function PaymentsScreen() {
                 <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
                   <p>
                     Page {payments.pagination.page} of {payments.pagination.total_pages}
+                    <span className="ml-2 text-xs text-slate-400">({payments.pagination.total} total)</span>
                   </p>
                   <div className="flex items-center gap-2">
                     <button
@@ -478,12 +503,13 @@ export function PaymentsScreen() {
           )}
         </section>
 
+        {/* ── Retailer Credit Panel ─────────────────────────────────── */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Retailer credit view</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Retailer credit dashboard</h2>
               <p className="text-sm text-slate-600">
-                Select a retailer to review credit limit, current exposure, advances, and last payment activity.
+                Review credit limit, outstanding balance, advance balance, and last payment activity.
               </p>
             </div>
 
@@ -518,36 +544,40 @@ export function PaymentsScreen() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Credit Limit</p>
                   <p className="mt-2 text-xl font-semibold text-slate-900">{formatCurrencyFromPaise(creditSummary.credit_limit)}</p>
+                  <p className="mt-1 text-xs text-slate-400">Maximum allowed credit exposure.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Outstanding</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Outstanding Balance</p>
                   <p className="mt-2 text-xl font-semibold text-slate-900">
                     {formatCurrencyFromPaise(creditSummary.current_outstanding)}
                   </p>
+                  <p className="mt-1 text-xs text-slate-400">Total unpaid order value minus payments.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Advance Balance</p>
                   <p className="mt-2 text-xl font-semibold text-slate-900">
                     {formatCurrencyFromPaise(creditSummary.advance_balance)}
                   </p>
+                  <p className="mt-1 text-xs text-slate-400">Excess payments over order totals (credit to retailer).</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Overdue</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Overdue (Simplified)</p>
                   <p className="mt-2 text-xl font-semibold text-slate-900">
                     {formatCurrencyFromPaise(creditSummary.overdue_amount)}
                   </p>
+                  <p className="mt-1 text-xs text-slate-400">Equals outstanding — no payment terms tracked yet.</p>
                 </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Last Payment</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Last Payment Date</p>
                 <p className="mt-2 text-sm font-medium text-slate-900">{formatDateTime(creditSummary.last_payment_date)}</p>
               </div>
 
               <form onSubmit={onSaveCreditLimit} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <label className="flex flex-1 flex-col gap-2 text-sm text-slate-700">
-                    <span className="font-medium">Update credit limit (INR)</span>
+                    <span className="font-medium">Update credit limit (₹)</span>
                     <input
                       type="number"
                       min="0"
@@ -572,6 +602,7 @@ export function PaymentsScreen() {
         </section>
       </div>
 
+      {/* ── Record Payment Modal ──────────────────────────────────── */}
       {isRecordModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
           <button
@@ -587,6 +618,12 @@ export function PaymentsScreen() {
             </div>
 
             <form onSubmit={onRecordPayment} className="flex flex-col gap-4 p-6">
+              {modalSuccess ? (
+                <div className="rounded-md bg-emerald-100 px-3 py-2 text-sm text-emerald-700">
+                  Payment recorded successfully!
+                </div>
+              ) : null}
+
               <label className="flex flex-col gap-2 text-sm text-slate-700">
                 <span className="font-medium">Retailer</span>
                 <select
@@ -595,7 +632,8 @@ export function PaymentsScreen() {
                     setModalRetailerId(event.target.value);
                     setModalOrderId("");
                   }}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400"
+                  disabled={modalSuccess}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400 disabled:opacity-60"
                 >
                   <option value="">Select retailer</option>
                   {retailers.map((retailer) => (
@@ -611,7 +649,8 @@ export function PaymentsScreen() {
                 <select
                   value={modalOrderId}
                   onChange={(event) => setModalOrderId(event.target.value)}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400"
+                  disabled={modalSuccess}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400 disabled:opacity-60"
                 >
                   <option value="">Select order</option>
                   {filteredOrders.map((order) => (
@@ -624,14 +663,15 @@ export function PaymentsScreen() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-2 text-sm text-slate-700">
-                  <span className="font-medium">Amount (INR)</span>
+                  <span className="font-medium">Amount (₹)</span>
                   <input
                     type="number"
                     min="0.01"
                     step="0.01"
                     value={modalAmount}
                     onChange={(event) => setModalAmount(event.target.value)}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400"
+                    disabled={modalSuccess}
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400 disabled:opacity-60"
                   />
                 </label>
 
@@ -640,7 +680,8 @@ export function PaymentsScreen() {
                   <select
                     value={modalPaymentMode}
                     onChange={(event) => setModalPaymentMode(event.target.value as PaymentMode)}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400"
+                    disabled={modalSuccess}
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400 disabled:opacity-60"
                   >
                     <option value="advance">Advance</option>
                     <option value="cod">COD</option>
@@ -655,8 +696,9 @@ export function PaymentsScreen() {
                   value={modalNote}
                   onChange={(event) => setModalNote(event.target.value)}
                   rows={3}
-                  placeholder="Optional note such as UPI reference, cheque note, or collection context"
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400"
+                  disabled={modalSuccess}
+                  placeholder="Optional note such as UPI reference, cheque number, or collection context"
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-400 disabled:opacity-60"
                 />
               </label>
 
@@ -668,15 +710,17 @@ export function PaymentsScreen() {
                   onClick={closeRecordModal}
                   className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700"
                 >
-                  Cancel
+                  {modalSuccess ? "Close" : "Cancel"}
                 </button>
-                <button
-                  type="submit"
-                  disabled={recording}
-                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {recording ? "Recording..." : "Submit payment"}
-                </button>
+                {!modalSuccess ? (
+                  <button
+                    type="submit"
+                    disabled={recording}
+                    className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {recording ? "Recording..." : "Submit payment"}
+                  </button>
+                ) : null}
               </div>
             </form>
           </div>

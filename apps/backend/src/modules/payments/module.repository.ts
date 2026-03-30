@@ -38,10 +38,6 @@ type RetailerLinkRow = {
   credit_limit_paise: number | string | null;
 };
 
-type CountRow = {
-  count: string;
-};
-
 export type PaymentMode = "advance" | "cod" | "credit";
 
 export type PaymentRecord = {
@@ -96,6 +92,14 @@ export type RetailerCreditSummary = {
   credit_limit: number;
   current_outstanding: number;
   advance_balance: number;
+  /**
+   * Simplified rule: overdue_amount = current_outstanding.
+   *
+   * A true overdue calculation requires invoice due-dates or payment terms,
+   * which the current schema does not support. This field equals
+   * current_outstanding so downstream consumers have a named "overdue"
+   * field ready for refinement when payment-term support is added.
+   */
   overdue_amount: number;
   last_payment_date: string | null;
 };
@@ -118,7 +122,11 @@ export type PaymentCalculationInput = {
   paid_at: string | Date;
 };
 
-const decimalRupeesToPaise = (value: string | number | null | undefined) => {
+/**
+ * Convert a DB decimal rupee value (e.g. "125.50") to integer paise (12550).
+ * Returns 0 for null/undefined.
+ */
+const decimalRupeesToPaise = (value: string | number | null | undefined): number => {
   if (value === null || value === undefined) {
     return 0;
   }
@@ -132,7 +140,10 @@ const decimalRupeesToPaise = (value: string | number | null | undefined) => {
   return isNegative ? -paise : paise;
 };
 
-const normalizePaise = (value: string | number | null | undefined) => {
+/**
+ * Safely coerce a DB numeric value to a JS number, returning 0 for null/undefined.
+ */
+const normalizePaise = (value: string | number | null | undefined): number => {
   if (value === null || value === undefined) {
     return 0;
   }
@@ -140,10 +151,14 @@ const normalizePaise = (value: string | number | null | undefined) => {
   return Number(value);
 };
 
-const toIsoString = (value: string | Date) => new Date(value).toISOString();
+const toIsoString = (value: string | Date): string => new Date(value).toISOString();
 
-const normalizeDate = (value: string | Date) => new Date(value).getTime();
+const normalizeDate = (value: string | Date): number => new Date(value).getTime();
 
+/**
+ * Compute per-order outstanding by subtracting payments from order totals.
+ * Outstanding is clamped to >= 0 (overpayment does not create negative outstanding).
+ */
 const getOutstandingByOrder = (
   orders: PaymentSummaryOrderInput[],
   payments: PaymentCalculationInput[],
@@ -170,7 +185,7 @@ const getOutstandingByOrder = (
   }));
 };
 
-const getLastPaymentDate = (payments: PaymentCalculationInput[]) => {
+const getLastPaymentDate = (payments: PaymentCalculationInput[]): string | Date | null => {
   if (payments.length === 0) {
     return null;
   }
@@ -180,6 +195,17 @@ const getLastPaymentDate = (payments: PaymentCalculationInput[]) => {
     .sort((left, right) => normalizeDate(right.paid_at) - normalizeDate(left.paid_at))[0]?.paid_at ?? null;
 };
 
+/**
+ * Derive a retailer's credit summary from raw order + payment records.
+ *
+ * Rules:
+ * - current_outstanding = max(totalOrderValue - totalPayments, 0)
+ * - advance_balance     = max(totalPayments - totalOrderValue, 0)
+ * - overdue_amount      = current_outstanding  (simplified; no payment-term support yet)
+ *
+ * Both current_outstanding and advance_balance are clamped to >= 0 to avoid
+ * misleading negative values when data is sparse or asymmetric.
+ */
 export const calculateRetailerCreditSummary = ({
   creditLimitPaise,
   orders,
@@ -189,9 +215,10 @@ export const calculateRetailerCreditSummary = ({
   orders: PaymentSummaryOrderInput[];
   payments: PaymentCalculationInput[];
 }): RetailerCreditSummary => {
-  const outstandingByOrder = getOutstandingByOrder(orders, payments);
   const totalOrderValue = orders.reduce((sum, order) => sum + normalizePaise(order.total_amount), 0);
   const totalPayments = payments.reduce((sum, payment) => sum + normalizePaise(payment.amount_paise), 0);
+
+  // Clamp to zero — negative outstanding or advance is not meaningful.
   const currentOutstanding = Math.max(totalOrderValue - totalPayments, 0);
   const advanceBalance = Math.max(totalPayments - totalOrderValue, 0);
   const lastPaymentDate = getLastPaymentDate(payments);
@@ -200,11 +227,20 @@ export const calculateRetailerCreditSummary = ({
     credit_limit: creditLimitPaise,
     current_outstanding: currentOutstanding,
     advance_balance: advanceBalance,
+    // Simplified rule: overdue = outstanding until payment-term schema is added.
     overdue_amount: currentOutstanding,
     last_payment_date: lastPaymentDate ? toIsoString(lastPaymentDate) : null,
   };
 };
 
+/**
+ * Derive the global payments summary (for the list page summary cards).
+ *
+ * Rules:
+ * - total_outstanding        = sum of per-order outstanding (clamped >= 0 per order)
+ * - advance_collected_today  = sum of advance-mode payments with paid_at within today
+ * - cod_pending              = sum of outstanding on cod-mode orders only
+ */
 export const calculatePaymentsSummary = ({
   orders,
   payments,
@@ -312,7 +348,9 @@ export class PaymentsRepository extends BaseRepository {
   }
 
   async listPayments(tenantId: string, filters: PaymentListFilters, db: DbExecutor = this.db): Promise<PaymentHistoryResult> {
-    const baseQuery = this.db("payment_transactions")
+    // BUG FIX: use `db` parameter consistently (was using `this.db` for baseQuery
+    // while the rest of the method may operate inside a transaction).
+    const baseQuery = db("payment_transactions")
       .where("payment_transactions.tenant_id", tenantId)
       .modify((builder) => {
         if (filters.retailer_id) {
