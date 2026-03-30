@@ -23,6 +23,7 @@ type OrderPaymentRow = {
   tenant_id: string;
   retailer_id: string;
   retailer_name?: string | null;
+  order_number: string;
   total_amount: number | string | null;
 };
 
@@ -309,6 +310,7 @@ export class PaymentsRepository extends BaseRepository {
         "orders.id",
         "orders.tenant_id",
         "orders.retailer_id",
+        "orders.order_number",
         "orders.total_amount",
         "retailers.name as retailer_name",
       );
@@ -322,6 +324,7 @@ export class PaymentsRepository extends BaseRepository {
       tenant_id: String(row.tenant_id),
       retailer_id: String(row.retailer_id),
       retailer_name: row.retailer_name ?? "Unknown retailer",
+      order_number: row.order_number,
       total_amount: decimalRupeesToPaise(row.total_amount),
     };
   }

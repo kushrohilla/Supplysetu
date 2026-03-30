@@ -1,20 +1,35 @@
+import { notificationsApi } from "../api/notifications-api";
 import { PushNotificationItem } from "../engagement.types";
 
 type PushNotificationListener = (notification: PushNotificationItem) => void;
 
 export const pushNotificationHandler = {
   subscribe(listener: PushNotificationListener) {
-    const timer = setTimeout(() => {
-      listener({
-        id: "push-1",
-        title: "Delivery update",
-        body: "Your latest order is dispatched and on route.",
-        createdAt: "2026-03-13T19:30:00Z"
-      });
-    }, 1500);
+    let disposed = false;
+    let lastSeenId: string | null = null;
+
+    const loadLatestNotification = async () => {
+      try {
+        const notification = await notificationsApi.fetchLatestInAppNotification();
+        if (!notification || disposed || notification.id === lastSeenId) {
+          return;
+        }
+
+        lastSeenId = notification.id;
+        listener(notification);
+      } catch {
+        // Keep the mobile UX resilient even when notification fetch fails.
+      }
+    };
+
+    void loadLatestNotification();
+    const timer = setInterval(() => {
+      void loadLatestNotification();
+    }, 60000);
 
     return () => {
-      clearTimeout(timer);
+      disposed = true;
+      clearInterval(timer);
     };
   }
 };

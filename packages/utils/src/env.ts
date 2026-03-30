@@ -30,6 +30,16 @@ const baseEnvSchema = z.object({
   DB_USER: z.string().min(1).optional(),
   DB_PASSWORD: z.string().optional(),
   DB_SSL: booleanParser.default(false),
+  NOTIFICATIONS_SMS_PROVIDER: z.enum(["disabled", "log"]).default("disabled"),
+  NOTIFICATIONS_SMS_SENDER_ID: z.string().optional(),
+  NOTIFICATIONS_SMS_API_KEY: z.string().optional(),
+  NOTIFICATIONS_WHATSAPP_PROVIDER: z.enum(["disabled", "log"]).default("disabled"),
+  NOTIFICATIONS_WHATSAPP_SENDER_ID: z.string().optional(),
+  NOTIFICATIONS_WHATSAPP_API_KEY: z.string().optional(),
+  NOTIFICATIONS_SCHEDULER_ENABLED: booleanParser.default(true),
+  NOTIFICATIONS_INACTIVITY_CRON: z.string().min(1).default("0 10 * * *"),
+  NOTIFICATIONS_INACTIVITY_DAYS: z.coerce.number().int().positive().default(7),
+  NOTIFICATIONS_INACTIVITY_COOLDOWN_HOURS: z.coerce.number().int().positive().default(72),
 });
 
 const DEVELOPMENT_DEFAULTS = {

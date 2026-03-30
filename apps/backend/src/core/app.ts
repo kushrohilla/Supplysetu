@@ -8,6 +8,8 @@ import { registerCatalogRoutes } from "../modules/catalog/module.routes";
 import { registerDistributorRoutes } from "../modules/distributor/module.routes";
 import { registerDispatchRoutes } from "../modules/dispatch/module.routes";
 import { registerInventoryRoutes } from "../modules/inventory/module.routes";
+import { registerNotificationsRoutes } from "../modules/notifications/module.routes";
+import { startNotificationsScheduler } from "../modules/notifications/lib/scheduler";
 import { registerOrderRoutes } from "../modules/order/module.routes";
 import { registerPaymentsRoutes } from "../modules/payments/module.routes";
 import { registerPricingRoutes } from "../modules/pricing/module.routes";
@@ -46,12 +48,20 @@ export const buildApp = async (db: Knex) => {
     await registerCatalogRoutes(api);
     await registerOrderRoutes(api);
     await registerInventoryRoutes(api);
+    await registerNotificationsRoutes(api);
     await registerPaymentsRoutes(api);
     await registerPricingRoutes(api);
     await registerRetailerRoutes(api);
   }, { prefix: env.API_PREFIX });
 
+  const stopNotificationsScheduler = startNotificationsScheduler({
+    notificationsService: container.notificationsService,
+    enabled: env.NOTIFICATIONS_SCHEDULER_ENABLED && env.NODE_ENV !== "test",
+    inactivityCron: env.NOTIFICATIONS_INACTIVITY_CRON,
+  });
+
   app.addHook("onClose", async () => {
+    stopNotificationsScheduler();
     await db.destroy();
   });
 

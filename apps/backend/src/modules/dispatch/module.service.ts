@@ -2,6 +2,7 @@ import type { Knex } from "knex";
 
 import { HTTP_STATUS } from "../../shared/constants/http-status";
 import { AppError } from "../../shared/errors/app-error";
+import type { NotificationsService } from "../notifications/module.service";
 import { ORDER_STATUS, canTransitionOrderStatus, type OrderStatus } from "../order/order-status";
 import type { OrderRepository } from "../order/module.repository";
 import type {
@@ -21,6 +22,7 @@ export class DispatchService {
     private readonly db: Knex,
     private readonly dispatchRepository: DispatchRepository,
     private readonly orderRepository: OrderRepository,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createRoute(input: CreateRouteInput): Promise<DispatchRouteRecord> {
@@ -119,7 +121,7 @@ export class DispatchService {
   }
 
   async dispatchBatch(input: { tenantId: string; batchId: string; actorId: string | null }): Promise<DispatchBatchRecord> {
-    return this.db.transaction(async (trx) => {
+    const result = await this.db.transaction(async (trx) => {
       const batch = await this.dispatchRepository.getBatchById(input.tenantId, input.batchId, trx);
       if (!batch) {
         throw new AppError(HTTP_STATUS.NOT_FOUND, "DISPATCH_BATCH_NOT_FOUND", "Dispatch batch not found");
@@ -130,8 +132,10 @@ export class DispatchService {
       }
 
       const batchOrders = await this.dispatchRepository.listBatchOrders(input.tenantId, input.batchId, trx);
+      const dispatchedOrders = [];
       for (const batchOrder of batchOrders) {
-        await this.transitionAdminOrderStatus(input.tenantId, batchOrder.order_id, ORDER_STATUS.DISPATCHED, input.actorId, trx);
+        const order = await this.transitionAdminOrderStatus(input.tenantId, batchOrder.order_id, ORDER_STATUS.DISPATCHED, input.actorId, trx);
+        dispatchedOrders.push(order);
       }
 
       const updated = await this.dispatchRepository.updateBatchStatus(input.tenantId, input.batchId, "DISPATCHED", trx);
@@ -139,12 +143,33 @@ export class DispatchService {
         throw new AppError(HTTP_STATUS.NOT_FOUND, "DISPATCH_BATCH_NOT_FOUND", "Dispatch batch not found");
       }
 
-      return updated;
+      return {
+        batch: updated,
+        dispatchedOrders,
+      };
     });
+
+    for (const order of result.dispatchedOrders) {
+      await this.safeDispatchNotification({
+        tenantId: input.tenantId,
+        eventType: "order_dispatched",
+        resourceType: "order",
+        resourceId: order.id,
+        recipientType: "retailer",
+        recipientId: order.retailer_id,
+        payload: {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          totalAmount: order.total_amount,
+        },
+      });
+    }
+
+    return result.batch;
   }
 
   async deliverOrder(input: { tenantId: string; orderId: string; actorId: string | null }) {
-    return this.db.transaction(async (trx) => {
+    const result = await this.db.transaction(async (trx) => {
       const batch = await this.dispatchRepository.findBatchByOrderId(input.tenantId, input.orderId, trx);
       if (!batch) {
         throw new AppError(HTTP_STATUS.NOT_FOUND, "DISPATCH_BATCH_NOT_FOUND", "Dispatch batch not found for order");
@@ -164,6 +189,22 @@ export class DispatchService {
         batch: updatedBatch,
       };
     });
+
+    await this.safeDispatchNotification({
+      tenantId: input.tenantId,
+      eventType: "order_delivered",
+      resourceType: "order",
+      resourceId: result.order.id,
+      recipientType: "retailer",
+      recipientId: result.order.retailer_id,
+      payload: {
+        orderId: result.order.id,
+        orderNumber: result.order.order_number,
+        totalAmount: result.order.total_amount,
+      },
+    });
+
+    return result;
   }
 
   private async transitionAdminOrderStatus(
@@ -200,5 +241,25 @@ export class DispatchService {
     }, trx);
 
     return updated;
+  }
+
+  private async safeDispatchNotification(input: {
+    tenantId: string;
+    eventType: "order_dispatched" | "order_delivered";
+    resourceType: "order";
+    resourceId: string;
+    recipientType: "retailer";
+    recipientId: string;
+    payload: {
+      orderId: string;
+      orderNumber: string;
+      totalAmount: number;
+    };
+  }) {
+    try {
+      await this.notificationsService.dispatchOperationalEvent(input);
+    } catch {
+      // Notification failures must never block the source dispatch workflow.
+    }
   }
 }

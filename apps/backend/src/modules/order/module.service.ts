@@ -2,6 +2,7 @@ import type { Knex } from "knex";
 
 import { HTTP_STATUS } from "../../shared/constants/http-status";
 import { AppError } from "../../shared/errors/app-error";
+import type { NotificationsService } from "../notifications/module.service";
 import type { OrderRepository } from "./module.repository";
 import {
   ORDER_STATUS,
@@ -39,6 +40,7 @@ export class OrderService {
   constructor(
     private readonly db: Knex,
     private readonly orderRepository: OrderRepository,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createOrder(tenantId: string, payload: CreateOrderPayload) {
@@ -86,7 +88,7 @@ export class OrderService {
   }
 
   async updateStatus(input: UpdateOrderStatusInput) {
-    return this.db.transaction(async (trx) => {
+    const updatedOrder = await this.db.transaction(async (trx) => {
       const order =
         input.actorRole === "retailer"
           ? await this.orderRepository.getRetailerOrderById(input.tenantId, input.retailerId ?? "", input.orderId, trx)
@@ -140,6 +142,24 @@ export class OrderService {
 
       return updated;
     });
+
+    if (input.nextStatus === ORDER_STATUS.CONFIRMED) {
+      await this.safeDispatchNotification({
+        tenantId: input.tenantId,
+        eventType: "order_confirmed",
+        resourceType: "order",
+        resourceId: updatedOrder.id,
+        recipientType: "retailer",
+        recipientId: updatedOrder.retailer_id,
+        payload: {
+          orderId: updatedOrder.id,
+          orderNumber: updatedOrder.order_number,
+          totalAmount: updatedOrder.total_amount,
+        },
+      });
+    }
+
+    return updatedOrder;
   }
 
   private async createTenantOrder(tenantId: string, retailerId: string, items: CreateOrderItemPayload[]) {
@@ -211,5 +231,25 @@ export class OrderService {
       product_id,
       quantity,
     }));
+  }
+
+  private async safeDispatchNotification(input: {
+    tenantId: string;
+    eventType: "order_confirmed";
+    resourceType: "order";
+    resourceId: string;
+    recipientType: "retailer";
+    recipientId: string;
+    payload: {
+      orderId: string;
+      orderNumber: string;
+      totalAmount: number;
+    };
+  }) {
+    try {
+      await this.notificationsService.dispatchOperationalEvent(input);
+    } catch {
+      // Notification failures must never block the source order workflow.
+    }
   }
 }
