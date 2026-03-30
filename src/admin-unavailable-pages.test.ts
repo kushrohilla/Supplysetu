@@ -1,28 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+// Dispatch, Delivery, and Packing pages are now live module screens (Phase 2B).
+// Only Reports remains as a genuine unavailable placeholder page.
 const unavailablePages = [
-  {
-    path: "apps/admin-web/app/(protected)/packing/page.tsx",
-    title: 'title="Packing"',
-    message: 'message="This feature is not available yet."',
-    futureDescription:
-      'futureDescription="Packing queues, pick lists, and completion workflows will appear here once backend support is ready."',
-  },
-  {
-    path: "apps/admin-web/app/(protected)/dispatch/page.tsx",
-    title: 'title="Dispatch"',
-    message: 'message="This feature is not available yet."',
-    futureDescription:
-      'futureDescription="Dispatch planning, batching, and logistics coordination will appear here once backend support is ready."',
-  },
-  {
-    path: "apps/admin-web/app/(protected)/delivery/page.tsx",
-    title: 'title="Delivery"',
-    message: 'message="This feature is not available yet."',
-    futureDescription:
-      'futureDescription="Delivery execution, proof of delivery, and collection workflows will appear here once backend support is ready."',
-  },
   {
     path: "apps/admin-web/app/(protected)/reports/page.tsx",
     title: 'title="Reports"',

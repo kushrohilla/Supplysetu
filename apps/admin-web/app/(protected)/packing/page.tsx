@@ -1,11 +1,5 @@
-import { ModuleUnavailableState } from "@/components/ui/module-unavailable-state";
+import { PackingScreen } from "@/modules/dispatch/PackingScreen";
 
 export default function PackingPage() {
-  return (
-    <ModuleUnavailableState
-      title="Packing"
-      message="This feature is not available yet."
-      futureDescription="Packing queues, pick lists, and completion workflows will appear here once backend support is ready."
-    />
-  );
+  return <PackingScreen />;
 }
