@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { HTTP_STATUS } from "../../shared/constants/http-status";
 import { AppError } from "../../shared/errors/app-error";
-import { createRetailerSchema, retailerParamsSchema, updateRetailerSchema } from "./retailer.schema";
+import { adminRetailersQuerySchema, createRetailerSchema, retailerParamsSchema, updateRetailerSchema } from "./retailer.schema";
 
 const getTenantIdOrThrow = (request: FastifyRequest) => {
   const tenantId = request.auth?.tenantId;
@@ -13,7 +13,32 @@ const getTenantIdOrThrow = (request: FastifyRequest) => {
   return tenantId;
 };
 
+const getAdminTenantIdOrThrow = (request: FastifyRequest) => {
+  const tenantId = request.auth?.tenantId;
+  if (!tenantId || request.auth?.tokenType !== "admin") {
+    throw new AppError(HTTP_STATUS.UNAUTHORIZED, "UNAUTHORIZED", "Unauthorized");
+  }
+
+  return tenantId;
+};
+
 export class RetailerController {
+  async listAdminRetailers(request: FastifyRequest, reply: FastifyReply) {
+    const tenantId = getAdminTenantIdOrThrow(request);
+    const query = adminRetailersQuerySchema.parse(request.query);
+    const result = await request.server.container.retailerService.listAdminRetailers(tenantId, query);
+
+    return reply.send({ success: true, data: result });
+  }
+
+  async getAdminRetailer(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const tenantId = getAdminTenantIdOrThrow(request);
+    const { id } = retailerParamsSchema.parse(request.params);
+    const retailer = await request.server.container.retailerService.getAdminRetailerDetail(tenantId, id);
+
+    return reply.send({ success: true, data: retailer });
+  }
+
   async createRetailer(request: FastifyRequest, reply: FastifyReply) {
     const tenantId = getTenantIdOrThrow(request);
     const payload = createRetailerSchema.parse(request.body);

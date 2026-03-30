@@ -1,6 +1,13 @@
 import { HTTP_STATUS } from "../../shared/constants/http-status";
 import { AppError } from "../../shared/errors/app-error";
-import type { RetailerCreateInput, RetailerRepository, RetailerUpdateInput } from "./retailer.repository";
+import type {
+  AdminRetailerDetail,
+  AdminRetailerListFilters,
+  AdminRetailerListResult,
+  RetailerCreateInput,
+  RetailerRepository,
+  RetailerUpdateInput,
+} from "./retailer.repository";
 
 const isUniqueViolation = (error: unknown) =>
   typeof error === "object" &&
@@ -38,6 +45,19 @@ export class RetailerService {
 
   async listRetailers(tenantId: string) {
     return this.retailerRepository.listByTenant(tenantId);
+  }
+
+  async listAdminRetailers(tenantId: string, filters: AdminRetailerListFilters): Promise<AdminRetailerListResult> {
+    return this.retailerRepository.listAdminRetailers(tenantId, filters);
+  }
+
+  async getAdminRetailerDetail(tenantId: string, retailerId: string): Promise<AdminRetailerDetail> {
+    const retailer = await this.retailerRepository.findAdminRetailerDetailById(tenantId, retailerId);
+    if (!retailer) {
+      throw new AppError(HTTP_STATUS.NOT_FOUND, "RETAILER_NOT_FOUND", "Retailer not found");
+    }
+
+    return retailer;
   }
 
   async getRetailer(tenantId: string, retailerId: string) {

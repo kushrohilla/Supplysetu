@@ -3,13 +3,6 @@ import { describe, expect, it } from "vitest";
 
 const unavailablePages = [
   {
-    path: "apps/admin-web/app/(protected)/retailers/page.tsx",
-    title: 'title="Retailers"',
-    message: 'message="This feature is not available yet."',
-    futureDescription:
-      'futureDescription="Retailer management, onboarding, and relationship tools will appear here once backend support is ready."',
-  },
-  {
     path: "apps/admin-web/app/(protected)/inventory/page.tsx",
     title: 'title="Inventory"',
     message: 'message="This feature is not available yet."',

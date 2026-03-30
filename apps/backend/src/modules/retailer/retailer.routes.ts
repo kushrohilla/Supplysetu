@@ -7,6 +7,12 @@ export const registerRetailerRoutes = async (fastify: FastifyInstance) => {
   const controller = new RetailerController();
   const authenticate = buildAuthMiddleware();
 
+  fastify.get("/admin/retailers", { preHandler: authenticate }, controller.listAdminRetailers.bind(controller));
+  fastify.get<{ Params: { id: string } }>(
+    "/admin/retailers/:id",
+    { preHandler: authenticate },
+    controller.getAdminRetailer.bind(controller),
+  );
   fastify.post("/retailers", { preHandler: authenticate }, controller.createRetailer.bind(controller));
   fastify.get("/retailers", { preHandler: authenticate }, controller.listRetailers.bind(controller));
   fastify.get<{ Params: { id: string } }>("/retailers/:id", { preHandler: authenticate }, controller.getRetailer.bind(controller));

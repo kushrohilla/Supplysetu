@@ -1,10 +1,17 @@
 import { z } from "zod";
 
 const optionalText = z.string().trim().min(1).optional();
+const paginationNumber = z.coerce.number().int().positive();
 
 export const retailerParamsSchema = z.object({
   id: z.string().min(1),
 });
+
+export const adminRetailersQuerySchema = z.object({
+  search: z.string().trim().optional(),
+  page: paginationNumber.default(1),
+  limit: paginationNumber.max(100).default(10),
+}).strict();
 
 export const createRetailerSchema = z.object({
   name: z.string().trim().min(1),

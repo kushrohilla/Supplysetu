@@ -18,6 +18,8 @@ const createContainer = () =>
       getRetailer: vi.fn(),
       updateRetailer: vi.fn(),
       softDeleteRetailer: vi.fn(),
+      listAdminRetailers: vi.fn(),
+      getAdminRetailerDetail: vi.fn(),
     },
   }) as unknown as AppContainer;
 
@@ -289,6 +291,153 @@ describe("retailer routes", () => {
     expect(response.json()).toMatchObject({
       success: false,
       error_code: "RETAILER_NOT_FOUND",
+    });
+  });
+
+  it("lists admin retailers with search and pagination for the authenticated tenant", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const retailerService = container.retailerService as unknown as { listAdminRetailers: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      userId: "user-1",
+      tenantId: "tenant-1",
+      tokenType: "admin",
+      role: "distributor_admin",
+    });
+    retailerService.listAdminRetailers.mockResolvedValue({
+      items: [
+        {
+          id: "retailer-1",
+          name: "Shop 1",
+          phone: "9999999999",
+          linked_at: "2026-03-30T10:00:00.000Z",
+          last_order_date: "2026-03-30T12:00:00.000Z",
+          total_orders: 3,
+          total_value: 125050,
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 5,
+        total: 7,
+        total_pages: 2,
+      },
+    });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerRetailerRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/admin/retailers?search=shop&page=2&limit=5",
+      headers: { authorization: "Bearer admin-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(retailerService.listAdminRetailers).toHaveBeenCalledWith("tenant-1", {
+      search: "shop",
+      page: 2,
+      limit: 5,
+    });
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        items: [{ id: "retailer-1", total_value: 125050 }],
+        pagination: {
+          page: 2,
+          limit: 5,
+          total: 7,
+          total_pages: 2,
+        },
+      },
+    });
+  });
+
+  it("rejects retailer tokens on admin retailer routes", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      retailerId: "retailer-1",
+      tenantId: "tenant-1",
+      tokenType: "retailer",
+    });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerRetailerRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/admin/retailers",
+      headers: { authorization: "Bearer retailer-token" },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      success: false,
+      error_code: "UNAUTHORIZED",
+    });
+  });
+
+  it("gets admin retailer detail for a linked tenant retailer", async () => {
+    const container = createContainer();
+    const authService = container.authService as unknown as { verifyAccessToken: ReturnType<typeof vi.fn> };
+    const retailerService = container.retailerService as unknown as { getAdminRetailerDetail: ReturnType<typeof vi.fn> };
+
+    authService.verifyAccessToken.mockReturnValue({
+      userId: "user-1",
+      tenantId: "tenant-1",
+      tokenType: "admin",
+      role: "distributor_admin",
+    });
+    retailerService.getAdminRetailerDetail.mockResolvedValue({
+      retailer: {
+        id: "retailer-1",
+        name: "Shop 1",
+        phone: "9999999999",
+        linked_at: "2026-03-01T00:00:00.000Z",
+      },
+      summary: {
+        total_orders: 4,
+        total_value: 200000,
+        last_order_date: "2026-03-29T10:00:00.000Z",
+      },
+      recent_orders: [
+        {
+          id: "order-1",
+          order_number: "ORD-000001",
+          status: "PLACED",
+          total_amount_paise: 50000,
+          created_at: "2026-03-29T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const app = fastify();
+    app.decorate("container", container);
+    app.setErrorHandler(errorHandler);
+    await registerRetailerRoutes(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/admin/retailers/retailer-1",
+      headers: { authorization: "Bearer admin-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(retailerService.getAdminRetailerDetail).toHaveBeenCalledWith("tenant-1", "retailer-1");
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        retailer: { id: "retailer-1" },
+        summary: { total_value: 200000 },
+        recent_orders: [{ id: "order-1", total_amount_paise: 50000 }],
+      },
     });
   });
 });
