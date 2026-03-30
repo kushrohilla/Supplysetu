@@ -22,6 +22,8 @@ import { PaymentsRepository } from "../../modules/payments/module.repository";
 import { PaymentsService } from "../../modules/payments/module.service";
 import { PricingRepository } from "../../modules/pricing/module.repository";
 import { PricingService } from "../../modules/pricing/module.service";
+import { ReportingRepository } from "../../modules/reporting/module.repository";
+import { ReportingService } from "../../modules/reporting/module.service";
 import { RetailerRepository as TenantRetailerRepository } from "../../modules/retailer/retailer.repository";
 import { RetailerService } from "../../modules/retailer/retailer.service";
 import { EventBus } from "../../shared/event-bus";
@@ -39,6 +41,7 @@ export interface AppContainer {
   notificationsService: NotificationsService;
   paymentsService: PaymentsService;
   pricingService: PricingService;
+  reportingService: ReportingService;
   retailerService: RetailerService;
   inviteService: InviteService;
 }
@@ -56,6 +59,7 @@ export const createContainer = (db: Knex): AppContainer => {
   const paymentsRepository = new PaymentsRepository(db);
   const pricingRepository = new PricingRepository(db);
   const orderRepository = new OrderRepository(db);
+  const reportingRepository = new ReportingRepository(db);
   const notificationsService = new NotificationsService({
     repository: notificationsRepository,
     smsProvider: createSmsProvider({
@@ -85,6 +89,7 @@ export const createContainer = (db: Knex): AppContainer => {
     notificationsService,
     paymentsService: new PaymentsService(db, paymentsRepository, notificationsService),
     pricingService: new PricingService(pricingRepository),
+    reportingService: new ReportingService({ repository: reportingRepository }),
     retailerService: new RetailerService(tenantRetailerRepository),
     inviteService: new InviteService(db, inviteRepository),
   };

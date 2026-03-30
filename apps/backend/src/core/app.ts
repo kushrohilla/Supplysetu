@@ -13,6 +13,7 @@ import { startNotificationsScheduler } from "../modules/notifications/lib/schedu
 import { registerOrderRoutes } from "../modules/order/module.routes";
 import { registerPaymentsRoutes } from "../modules/payments/module.routes";
 import { registerPricingRoutes } from "../modules/pricing/module.routes";
+import { registerReportingRoutes } from "../modules/reporting/module.routes";
 import { registerRetailerRoutes } from "../modules/retailer/retailer.routes";
 import { errorHandler } from "../shared/middleware/error-handler";
 import { notFoundHandler } from "../shared/middleware/not-found-handler";
@@ -51,6 +52,7 @@ export const buildApp = async (db: Knex) => {
     await registerNotificationsRoutes(api);
     await registerPaymentsRoutes(api);
     await registerPricingRoutes(api);
+    await registerReportingRoutes(api);
     await registerRetailerRoutes(api);
   }, { prefix: env.API_PREFIX });
 
