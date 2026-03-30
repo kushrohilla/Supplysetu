@@ -6,8 +6,10 @@ import type { Knex } from "knex";
 import { registerAuthRoutes } from "../modules/auth/module.routes";
 import { registerCatalogRoutes } from "../modules/catalog/module.routes";
 import { registerDistributorRoutes } from "../modules/distributor/module.routes";
+import { registerDispatchRoutes } from "../modules/dispatch/module.routes";
 import { registerInventoryRoutes } from "../modules/inventory/module.routes";
 import { registerOrderRoutes } from "../modules/order/module.routes";
+import { registerPaymentsRoutes } from "../modules/payments/module.routes";
 import { registerPricingRoutes } from "../modules/pricing/module.routes";
 import { registerRetailerRoutes } from "../modules/retailer/retailer.routes";
 import { errorHandler } from "../shared/middleware/error-handler";
@@ -40,9 +42,11 @@ export const buildApp = async (db: Knex) => {
   await app.register(async (api) => {
     await registerAuthRoutes(api);
     await registerDistributorRoutes(api);
+    await registerDispatchRoutes(api);
     await registerCatalogRoutes(api);
     await registerOrderRoutes(api);
     await registerInventoryRoutes(api);
+    await registerPaymentsRoutes(api);
     await registerPricingRoutes(api);
     await registerRetailerRoutes(api);
   }, { prefix: env.API_PREFIX });

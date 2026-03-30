@@ -30,13 +30,6 @@ const unavailablePages = [
     futureDescription:
       'futureDescription="Operational reports and business insights will appear here once backend support is ready."',
   },
-  {
-    path: "apps/admin-web/app/(protected)/payments/page.tsx",
-    title: 'title="Payments"',
-    message: 'message="This feature is not available yet."',
-    futureDescription:
-      'futureDescription="Payment tracking, reconciliation, and settlement workflows will appear here once backend support is ready."',
-  },
 ];
 
 describe("unsupported admin pages", () => {
