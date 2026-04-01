@@ -1,3 +1,7 @@
+export type DistributorInviteLinkResponse = {
+  invite_link: string;
+};
+
 export type RetailerInviteRecord = {
   tenant_id: string;
   invite_code: string;
